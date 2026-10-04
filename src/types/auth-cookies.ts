@@ -1,0 +1,8 @@
+export const AUTH_COOKIE_KINDS = {
+  ADMIN_SESSION: "ADMIN_SESSION",
+  STORE_SESSION: "STORE_SESSION",
+  OPERATOR_SESSION: "OPERATOR_SESSION",
+} as const;
+
+export type AuthCookieKind =
+  (typeof AUTH_COOKIE_KINDS)[keyof typeof AUTH_COOKIE_KINDS];
