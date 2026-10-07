@@ -35,32 +35,76 @@ export const customerPhoneSchema = z
       normalizeJordanPhone(value)!,
   );
 
+const customerFields = {
+  name: customerNameSchema,
+
+  phone: customerPhoneSchema,
+
+  primaryAddress: z
+    .string()
+    .trim()
+    .max(
+      250,
+      "العنوان طويل جدًا.",
+    )
+    .default(""),
+
+  adminNotes: z
+    .string()
+    .trim()
+    .max(
+      1000,
+      "الملاحظات طويلة جدًا.",
+    )
+    .default(""),
+};
+
 export const createCustomerSchema =
-  z.object({
-    name: customerNameSchema,
+  z.object(customerFields);
 
-    phone: customerPhoneSchema,
-
-    primaryAddress: z
-      .string()
-      .trim()
-      .max(
-        250,
-        "العنوان طويل جدًا.",
-      )
-      .default(""),
-
-    adminNotes: z
-      .string()
-      .trim()
-      .max(
-        1000,
-        "الملاحظات طويلة جدًا.",
-      )
-      .default(""),
-  });
+export const updateCustomerSchema =
+  z.object(customerFields);
 
 export type CreateCustomerInput =
   z.infer<
     typeof createCustomerSchema
+  >;
+
+export type UpdateCustomerInput =
+  z.infer<
+    typeof updateCustomerSchema
+  >;
+
+  export const creditCustomerCouponsSchema =
+  z.object({
+    amount: z
+      .number()
+      .int(
+        "عدد الكوبونات يجب أن يكون رقمًا صحيحًا.",
+      )
+      .min(
+        1,
+        "يجب إضافة كوبون واحد على الأقل.",
+      )
+      .max(
+        22,
+        "لا يمكن إضافة أكثر من 22 كوبون في العملية.",
+      ),
+
+    reason: z
+      .string()
+      .trim()
+      .min(
+        2,
+        "اكتب سبب إضافة الكوبونات.",
+      )
+      .max(
+        200,
+        "سبب العملية طويل جدًا.",
+      ),
+  });
+
+export type CreditCustomerCouponsInput =
+  z.infer<
+    typeof creditCustomerCouponsSchema
   >;

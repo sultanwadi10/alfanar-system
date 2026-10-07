@@ -975,3 +975,222 @@
     transition: none;
   }
 }
+
+.tabsRow {
+  display: flex;
+  align-items: center;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 12px;
+
+  padding: 4px;
+
+  background:
+    var(--color-surface);
+}
+
+.tabButton,
+.activeTab {
+  display: flex;
+
+  min-height: 38px;
+
+  align-items: center;
+
+  gap: 8px;
+
+  border: 0;
+  border-radius: 9px;
+
+  padding:
+    0 13px;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.tabButton {
+  background:
+    transparent;
+
+  color:
+    var(--color-text-muted);
+}
+
+.tabButton:hover {
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text);
+}
+
+.activeTab {
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+}
+
+.tabButton span,
+.activeTab span {
+  display: grid;
+
+  min-width: 21px;
+  height: 21px;
+
+  place-items: center;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-surface-secondary);
+
+  font-size: 10px;
+}
+
+.creatorBadge {
+  display: inline-flex;
+
+  align-items: center;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 999px;
+
+  padding:
+    5px 8px;
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rowActions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+}
+
+.restoreButton {
+  min-height: 32px;
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 35%,
+      var(--color-border)
+    );
+
+  border-radius: 9px;
+
+  padding:
+    0 11px;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.restoreButton:hover:not(:disabled) {
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 17%,
+      var(--color-surface)
+    );
+}
+
+.restoreButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.successMessage,
+.errorMessage {
+  border-radius: 11px;
+
+  padding:
+    11px 13px;
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.successMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+}
+
+.errorMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-danger) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-danger) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-danger);
+}

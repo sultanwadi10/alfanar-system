@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
 
 import {
-  createCustomerRecord,
+  CustomerLinkedPhoneChangeError,
   CustomerPhoneAlreadyExistsError,
+  updateCustomerRecord,
 } from "@/lib/customers/customer-repository";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
 import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
-import { createCustomerSchema } from "@/lib/validation/customer";
+import { updateCustomerSchema } from "@/lib/validation/customer";
 
-export async function POST(
+type RouteContext = {
+  params: Promise<{
+    customerId: string;
+  }>;
+};
+
+export async function PATCH(
   request: Request,
+  context: RouteContext,
 ) {
   try {
     const securityContext =
@@ -41,6 +49,25 @@ export async function POST(
       );
     }
 
+    const { customerId } =
+      await context.params;
+
+    if (!customerId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_CUSTOMER_ID",
+            message:
+              "معرف العميل غير صالح.",
+          },
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     let body: unknown;
 
     try {
@@ -62,7 +89,7 @@ export async function POST(
     }
 
     const parsed =
-      createCustomerSchema.safeParse(
+      updateCustomerSchema.safeParse(
         body,
       );
 
@@ -84,51 +111,63 @@ export async function POST(
       );
     }
 
-   const customer =
-  await createCustomerRecord({
-    name: parsed.data.name,
+    const customer =
+      await updateCustomerRecord(
+        customerId,
+        {
+          name:
+            parsed.data.name,
 
-    phoneNormalized:
-      parsed.data.phone,
+          phoneNormalized:
+            parsed.data.phone,
 
-    primaryAddress:
-      parsed.data.primaryAddress,
+          primaryAddress:
+            parsed.data.primaryAddress,
 
-    adminNotes:
-      parsed.data.adminNotes,
+          adminNotes:
+            parsed.data.adminNotes,
 
-    creator: {
-      source: "ADMIN",
-
-      authUid:
-        securityContext.authUid,
-    },
-  });
-    return NextResponse.json(
-      {
-        success: true,
-
-        customer: {
-          id: customer.id,
-
-          name: customer.name,
-
-          phone: customer.phone,
-
-          couponBalance:
-            customer.couponBalance,
-
-          appLinked:
-            customer.appLinked,
-
-          createdAt:
-            customer.createdAt.toISOString(),
+          adminAuthUid:
+            securityContext.authUid,
         },
+      );
+
+    if (!customer) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "CUSTOMER_NOT_FOUND",
+            message:
+              "العميل غير موجود.",
+          },
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+
+      customer: {
+        id: customer.id,
+
+        name: customer.name,
+
+        phone: customer.phone,
+
+        primaryAddress:
+          customer.primaryAddress,
+
+        adminNotes:
+          customer.adminNotes,
+
+        appLinked:
+          customer.appLinked,
       },
-      {
-        status: 201,
-      },
-    );
+    });
   } catch (error) {
     if (
       error instanceof
@@ -150,6 +189,26 @@ export async function POST(
       );
     }
 
+    if (
+      error instanceof
+      CustomerLinkedPhoneChangeError
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code:
+              "CUSTOMER_PHONE_LINKED",
+            message:
+              error.message,
+          },
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     if (isSecurityError(error)) {
       return toSecurityResponse(
         error,
@@ -157,7 +216,7 @@ export async function POST(
     }
 
     console.error(
-      "Failed to create customer:",
+      "Failed to update customer:",
       error,
     );
 
@@ -167,7 +226,7 @@ export async function POST(
         error: {
           code: "INTERNAL_ERROR",
           message:
-            "حدث خطأ أثناء إنشاء العميل.",
+            "حدث خطأ أثناء تعديل العميل.",
         },
       },
       {

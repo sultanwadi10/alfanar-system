@@ -1,0 +1,818 @@
+.page {
+  display: grid;
+  gap: 22px;
+
+  width: 100%;
+  max-width: 1400px;
+
+  margin: 0 auto;
+
+  color: var(--color-text);
+}
+
+.topBar {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.backLink {
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 10px;
+
+  padding:
+    8px 11px;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text);
+
+  text-decoration: none;
+
+  font-weight: 700;
+
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.backLink:hover {
+  border-color:
+    var(--color-primary);
+
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+}
+
+.profileHeader {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 20px;
+
+  padding:
+    24px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.identity {
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+}
+
+.avatar {
+  display: grid;
+
+  width: 58px;
+  height: 58px;
+
+  flex: 0 0 58px;
+
+  place-items: center;
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-primary) 25%,
+      var(--color-border)
+    );
+
+  border-radius: 17px;
+
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.eyebrow {
+  margin:
+    0 0 4px;
+
+  color:
+    var(--color-primary);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.identity h1 {
+  margin:
+    0 0 7px;
+
+  color:
+    var(--color-text);
+
+  font-size: 28px;
+}
+
+.profileMeta {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 7px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.profileBadges {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  justify-content: flex-end;
+
+  gap: 8px;
+}
+
+.linkedBadge,
+.notLinkedBadge,
+.sourceBadge {
+  border-radius: 999px;
+
+  padding:
+    6px 10px;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.linkedBadge {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 30%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+}
+
+.notLinkedBadge,
+.sourceBadge {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text-muted);
+}
+
+.successMessage,
+.errorMessage {
+  border-radius: 11px;
+
+  padding:
+    11px 13px;
+
+  font-size: 12px;
+}
+
+.successMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+}
+
+.errorMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-danger) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-danger) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-danger);
+}
+
+.statsGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 16px;
+}
+
+.statCard {
+  display: grid;
+
+  min-height: 130px;
+
+  gap: 8px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 17px;
+
+  padding: 18px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.statCard span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statCard strong {
+  color:
+    var(--color-text);
+
+  font-size: 24px;
+}
+
+.statCard small {
+  margin-top: auto;
+
+  color:
+    var(--color-text-muted);
+
+  line-height: 1.5;
+}
+
+.contentGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.6fr)
+    minmax(300px, 0.7fr);
+
+  gap: 18px;
+
+  align-items: start;
+}
+
+.detailsCard,
+.walletCard,
+.dangerCard {
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 19px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.cardHeader {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding:
+    19px 20px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.cardHeader h2 {
+  margin:
+    0 0 4px;
+
+  color:
+    var(--color-text);
+
+  font-size: 17px;
+}
+
+.cardHeader p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.editButton {
+  min-height: 36px;
+
+  border:
+    1px solid
+    var(--color-primary);
+
+  border-radius: 10px;
+
+  padding:
+    0 12px;
+
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.detailsList {
+  display: grid;
+
+  padding:
+    8px 20px;
+}
+
+.detailRow {
+  display: flex;
+
+  min-height: 58px;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+}
+
+.detailRow span,
+.notesRow > span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.detailRow strong {
+  color:
+    var(--color-text);
+
+  font-size: 13px;
+}
+
+.phone {
+  direction: ltr;
+}
+
+.notesRow {
+  display: grid;
+
+  gap: 8px;
+
+  padding:
+    16px 0;
+}
+
+.notesRow p {
+  margin: 0;
+
+  color:
+    var(--color-text);
+
+  font-size: 13px;
+  line-height: 1.8;
+
+  white-space: pre-wrap;
+}
+
+.editForm {
+  display: grid;
+
+  gap: 17px;
+
+  padding: 20px;
+}
+
+.editForm label {
+  display: grid;
+
+  gap: 7px;
+
+  color:
+    var(--color-text);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.editForm input,
+.editForm textarea {
+  width: 100%;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 11px;
+
+  padding:
+    12px 13px;
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text);
+
+  caret-color:
+    var(--color-primary);
+
+  font: inherit;
+
+  outline: none;
+
+  resize: vertical;
+}
+
+.editForm input:focus,
+.editForm textarea:focus {
+  border-color:
+    var(--color-primary);
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    0 0 0 3px
+    color-mix(
+      in srgb,
+      var(--color-primary) 15%,
+      transparent
+    );
+}
+
+.editForm input:disabled,
+.editForm textarea:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.65;
+}
+
+.editForm small {
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.formActions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 9px;
+}
+
+.cancelButton,
+.saveButton {
+  min-height: 40px;
+
+  border-radius: 10px;
+
+  padding:
+    0 14px;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.cancelButton {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text);
+}
+
+.saveButton {
+  border: 0;
+
+  background:
+    var(--color-primary);
+
+  color: #ffffff;
+}
+
+.cancelButton:disabled,
+.saveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sideColumn {
+  display: grid;
+
+  gap: 18px;
+}
+
+.walletContent {
+  display: grid;
+
+  gap: 10px;
+
+  padding: 22px;
+}
+
+.walletContent > strong {
+  color:
+    var(--color-text);
+
+  font-size: 34px;
+}
+
+.walletContent > span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.walletContent p {
+  margin: 4px 0 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.progressTrack {
+  overflow: hidden;
+
+  height: 9px;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.progressTrack span {
+  display: block;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #a855f7,
+      var(--color-primary)
+    );
+
+  transition:
+    width 0.5s ease;
+}
+
+.dangerCard {
+  display: grid;
+
+  gap: 16px;
+
+  padding: 20px;
+}
+
+.dangerCard h2 {
+  margin:
+    0 0 6px;
+
+  color:
+    var(--color-danger);
+
+  font-size: 16px;
+}
+
+.dangerCard p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.archiveButton {
+  min-height: 40px;
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-danger) 40%,
+      var(--color-border)
+    );
+
+  border-radius: 10px;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-danger) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-danger);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.archiveButton:hover:not(:disabled) {
+  background:
+    color-mix(
+      in srgb,
+      var(--color-danger) 16%,
+      var(--color-surface)
+    );
+}
+
+.archiveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 1000px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .profileHeader {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+  .profileBadges {
+    justify-content: flex-start;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .identity {
+    align-items: flex-start;
+  }
+
+  .identity h1 {
+    font-size: 23px;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+  .detailRow {
+    align-items: flex-start;
+
+    flex-direction: column;
+
+    justify-content: center;
+
+    gap: 5px;
+
+    padding:
+      12px 0;
+  }
+
+  .formActions {
+    display: grid;
+
+    grid-template-columns:
+      1fr 1fr;
+  }
+}
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+  .backLink,
+  .progressTrack span {
+    transition: none;
+  }
+}

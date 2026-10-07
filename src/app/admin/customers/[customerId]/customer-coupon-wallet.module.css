@@ -1,0 +1,440 @@
+.wallet {
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 19px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.header {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding:
+    19px 20px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.header h2 {
+  margin:
+    0 0 4px;
+
+  color:
+    var(--color-text);
+
+  font-size: 17px;
+}
+
+.header p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.balance {
+  display: flex;
+
+  align-items: baseline;
+
+  gap: 4px;
+}
+
+.balance strong {
+  color:
+    var(--color-primary);
+
+  font-size: 30px;
+}
+
+.balance span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.progressTrack {
+  overflow: hidden;
+
+  height: 9px;
+
+  margin:
+    20px 20px 8px;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.progressTrack span {
+  display: block;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #a855f7,
+      var(--color-primary)
+    );
+
+  transition:
+    width 0.4s ease;
+}
+
+.capacity {
+  padding:
+    0 20px 18px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.capacity strong {
+  color:
+    var(--color-text);
+}
+
+.creditForm {
+  display: grid;
+
+  gap: 14px;
+
+  padding: 18px 20px;
+
+  border-top:
+    1px solid
+    var(--color-border);
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.formGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(110px, 0.4fr)
+    minmax(0, 1fr);
+
+  gap: 12px;
+}
+
+.creditForm label {
+  display: grid;
+
+  gap: 7px;
+
+  color:
+    var(--color-text);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.creditForm input {
+  width: 100%;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 10px;
+
+  padding:
+    11px 12px;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text);
+
+  caret-color:
+    var(--color-primary);
+
+  font: inherit;
+
+  outline: none;
+}
+
+.creditForm input:focus {
+  border-color:
+    var(--color-primary);
+
+  box-shadow:
+    0 0 0 3px
+    color-mix(
+      in srgb,
+      var(--color-primary) 15%,
+      transparent
+    );
+}
+
+.creditForm input:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.6;
+}
+
+.creditButton {
+  min-height: 40px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background:
+    var(--color-primary);
+
+  color: #ffffff;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.creditButton:hover:not(:disabled) {
+  background:
+    var(--color-primary-hover);
+}
+
+.creditButton:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.6;
+}
+
+.errorMessage,
+.successMessage,
+.archivedMessage {
+  border-radius: 10px;
+
+  padding:
+    10px 11px;
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.errorMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-danger) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-danger) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-danger);
+}
+
+.successMessage {
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 35%,
+      var(--color-border)
+    );
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+}
+
+.archivedMessage {
+  margin:
+    18px 20px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text-muted);
+}
+
+.history {
+  display: grid;
+
+  gap: 14px;
+
+  padding: 20px;
+}
+
+.historyHeader {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+}
+
+.historyHeader h3 {
+  margin: 0;
+
+  color:
+    var(--color-text);
+
+  font-size: 14px;
+}
+
+.historyHeader span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+}
+
+.emptyHistory {
+  border:
+    1px dashed
+    var(--color-border);
+
+  border-radius: 11px;
+
+  padding: 22px;
+
+  color:
+    var(--color-text-muted);
+
+  text-align: center;
+
+  font-size: 11px;
+}
+
+.transactionList {
+  display: grid;
+
+  gap: 10px;
+}
+
+.transaction {
+  display: grid;
+
+  gap: 8px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 12px;
+
+  padding: 13px;
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.transactionTop {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 12px;
+}
+
+.transactionTop > div {
+  display: grid;
+
+  gap: 2px;
+}
+
+.transactionTop strong {
+  color:
+    var(--color-success);
+
+  font-size: 12px;
+}
+
+.transactionTop span,
+.transactionTop time {
+  color:
+    var(--color-text-muted);
+
+  font-size: 9px;
+}
+
+.transaction p {
+  margin: 0;
+
+  color:
+    var(--color-text);
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.balanceChange {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+}
+
+@media (max-width: 560px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .transactionTop {
+    flex-direction: column;
+  }
+}
