@@ -1,0 +1,1024 @@
+.dashboard {
+  display: grid;
+  gap: 24px;
+
+  width: 100%;
+  max-width: 1500px;
+
+  margin: 0 auto;
+
+  color: var(--color-text);
+}
+
+.hero {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 22px;
+
+  padding:
+    26px 28px;
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--color-surface),
+      var(--color-surface-secondary)
+    );
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.eyebrow {
+  margin:
+    0 0 4px;
+
+  color:
+    var(--color-primary);
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hero h1 {
+  margin:
+    0 0 8px;
+
+  color:
+    var(--color-text);
+
+  font-size:
+    clamp(
+      27px,
+      3vw,
+      38px
+    );
+
+  line-height: 1.3;
+}
+
+.heroText {
+  max-width: 700px;
+
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.systemStatus {
+  display: flex;
+
+  flex: 0 0 auto;
+
+  align-items: center;
+
+  gap: 8px;
+
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--color-success) 35%,
+      var(--color-border)
+    );
+
+  border-radius: 999px;
+
+  padding:
+    9px 13px;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--color-success) 10%,
+      var(--color-surface)
+    );
+
+  color:
+    var(--color-success);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-success);
+
+  box-shadow:
+    0 0 0 4px
+    color-mix(
+      in srgb,
+      var(--color-success) 15%,
+      transparent
+    );
+
+  animation:
+    statusPulse 1.8s ease-in-out infinite;
+}
+
+.summaryGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
+
+  gap: 16px;
+}
+
+.summaryCard {
+  display: grid;
+
+  min-height: 158px;
+
+  gap: 10px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 18px;
+
+  padding: 20px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+
+  animation:
+    cardEnter 0.45s ease both;
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.2s ease;
+}
+
+.summaryCard:hover {
+  transform:
+    translateY(-2px);
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--color-primary) 45%,
+      var(--color-border)
+    );
+}
+
+.summaryCardTop {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cardIndicator,
+.neutralIndicator {
+  border-radius: 999px;
+
+  padding:
+    4px 8px;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.cardIndicator {
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+}
+
+.neutralIndicator {
+  border:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text-muted);
+}
+
+.summaryCard > strong {
+  margin-top: 4px;
+
+  color:
+    var(--color-text);
+
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.summaryCard small {
+  margin-top: auto;
+
+  color:
+    var(--color-text-muted);
+
+  line-height: 1.5;
+}
+
+.shiftValue {
+  color:
+    var(--color-text-muted) !important;
+}
+
+.section {
+  display: grid;
+
+  gap: 14px;
+}
+
+.sectionTitle {
+  display: flex;
+
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.sectionTitle h2 {
+  margin:
+    0 0 5px;
+
+  color:
+    var(--color-text);
+
+  font-size: 19px;
+}
+
+.sectionTitle p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.sectionHint {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.paymentGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 16px;
+}
+
+.paymentCard {
+  position: relative;
+
+  overflow: hidden;
+
+  display: grid;
+
+  min-height: 150px;
+
+  gap: 10px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 18px;
+
+  padding:
+    20px 20px 18px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.paymentCard::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  right: 0;
+  left: 0;
+
+  height: 3px;
+
+  background:
+    var(--payment-color);
+}
+
+.paymentCard:hover {
+  transform:
+    translateY(-2px);
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--payment-color) 45%,
+      var(--color-border)
+    );
+}
+
+.cashPayment {
+  --payment-color: #22c55e;
+}
+
+.clickPayment {
+  --payment-color: #3b82f6;
+}
+
+.couponPayment {
+  --payment-color: #a855f7;
+}
+
+.paymentHeader {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.paymentDot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 999px;
+
+  background:
+    var(--payment-color);
+
+  box-shadow:
+    0 0 0 4px
+    color-mix(
+      in srgb,
+      var(--payment-color) 12%,
+      transparent
+    );
+}
+
+.paymentCard strong {
+  color:
+    var(--color-text);
+
+  font-size: 26px;
+}
+
+.paymentCard p {
+  margin:
+    auto 0 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mainGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.75fr)
+    minmax(280px, 0.75fr);
+
+  gap: 18px;
+
+  align-items: stretch;
+}
+
+.largeCard,
+.sideCard,
+.tableCard,
+.shiftCard {
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 19px;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.cardHeader {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding:
+    20px 22px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.cardHeader h2 {
+  margin:
+    0 0 5px;
+
+  color:
+    var(--color-text);
+
+  font-size: 18px;
+}
+
+.cardHeader p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.cardHeader > span {
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 999px;
+
+  padding:
+    5px 9px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chartArea {
+  position: relative;
+
+  min-height: 330px;
+
+  padding:
+    34px 24px 22px;
+}
+
+.chartGrid {
+  position: absolute;
+
+  inset:
+    34px 24px 22px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: space-between;
+
+  pointer-events: none;
+}
+
+.chartGrid span {
+  display: block;
+
+  width: 100%;
+
+  border-top:
+    1px dashed
+    var(--color-border);
+}
+
+.chartBars {
+  position: absolute;
+
+  inset:
+    34px 34px 22px;
+
+  display: flex;
+
+  align-items: flex-end;
+
+  gap: 9px;
+}
+
+.chartBars span {
+  flex: 1;
+
+  min-width: 10px;
+
+  border-radius:
+    8px 8px 3px 3px;
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--color-chart-end),
+      var(--color-chart-start)
+    );
+
+  transform-origin: bottom;
+
+  box-shadow:
+    0 8px 18px
+    color-mix(
+      in srgb,
+      var(--color-primary) 18%,
+      transparent
+    );
+
+  animation:
+    growBar
+    0.75s
+    cubic-bezier(
+      0.2,
+      0.8,
+      0.2,
+      1
+    )
+    both;
+}
+
+.chartFooter {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding:
+    0 22px 18px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+}
+
+.productsList {
+  display: grid;
+
+  gap: 18px;
+
+  padding: 22px;
+}
+
+.productItem {
+  display: grid;
+
+  gap: 9px;
+}
+
+.productInfo {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+}
+
+.productInfo strong {
+  color:
+    var(--color-text);
+
+  font-size: 13px;
+}
+
+.productInfo span,
+.productItem small {
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.progressTrack {
+  overflow: hidden;
+
+  height: 8px;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.progressTrack span {
+  display: block;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--color-chart-start),
+      var(--color-chart-end)
+    );
+
+  transition:
+    width 0.7s ease;
+}
+
+.operationsGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 16px;
+}
+
+.operationCard {
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+
+  min-height: 125px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 18px;
+
+  padding:
+    18px 20px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.operationIcon {
+  display: grid;
+
+  width: 46px;
+  height: 46px;
+
+  flex: 0 0 46px;
+
+  place-items: center;
+
+  border-radius: 13px;
+
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.operationCard > div:last-child {
+  display: grid;
+
+  gap: 3px;
+}
+
+.operationCard span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.operationCard strong {
+  color:
+    var(--color-text);
+
+  font-size: 14px;
+}
+
+.operationCard small {
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.bottomGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.5fr)
+    minmax(280px, 0.7fr);
+
+  gap: 18px;
+}
+
+.emptyOrders {
+  display: grid;
+
+  min-height: 240px;
+
+  place-items: center;
+
+  align-content: center;
+
+  gap: 7px;
+
+  padding: 30px;
+
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+
+  width: 52px;
+  height: 52px;
+
+  place-items: center;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 15px;
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-primary);
+
+  font-weight: 900;
+}
+
+.emptyOrders strong {
+  color:
+    var(--color-text);
+
+  font-size: 14px;
+}
+
+.emptyOrders span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.shiftContent {
+  display: grid;
+
+  padding:
+    10px 22px;
+}
+
+.shiftRow {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  min-height: 49px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+}
+
+.shiftRow:last-child {
+  border-bottom: 0;
+}
+
+.shiftRow span {
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.shiftRow strong {
+  color:
+    var(--color-text);
+
+  font-size: 12px;
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+}
+
+@keyframes growBar {
+  from {
+    opacity: 0;
+
+    transform:
+      scaleY(0);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      scaleY(1);
+  }
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
+
+    transform:
+      scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+
+    transform:
+      scale(0.85);
+  }
+}
+
+@media (max-width: 1180px) {
+  .summaryGrid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .mainGrid,
+  .bottomGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .paymentGrid,
+  .operationsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .dashboard {
+    gap: 18px;
+  }
+
+  .hero {
+    align-items: flex-start;
+
+    flex-direction: column;
+
+    padding:
+      20px 18px;
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .summaryCard {
+    min-height: 135px;
+  }
+
+  .sectionTitle {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+  .chartArea {
+    min-height: 260px;
+
+    padding:
+      28px 14px 20px;
+  }
+
+  .chartGrid {
+    inset:
+      28px 14px 20px;
+  }
+
+  .chartBars {
+    inset:
+      28px 20px 20px;
+
+    gap: 5px;
+  }
+
+  .chartFooter {
+    display: none;
+  }
+
+  .cardHeader {
+    padding:
+      17px 18px;
+  }
+}
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+  .summaryCard,
+  .chartBars span,
+  .statusDot {
+    animation: none;
+  }
+
+  .summaryCard,
+  .paymentCard,
+  .progressTrack span {
+    transition: none;
+  }
+}

@@ -10,4 +10,4 @@ export const SECURITY_ERROR_CODES = {
 } as const;
 
 export type SecurityErrorCode =
-  (typeof SECURITY_ERROR_CODES)[keyof typeof SECURITY_ERROR_CODES];
+  (typeof SECURITY_ERROR_CODES)[keyof typeof SECURITY_ERROR_CODES]; 

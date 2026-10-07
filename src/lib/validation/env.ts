@@ -22,3 +22,10 @@ export type FirebaseClientEnv = z.infer<
 export type FirebaseAdminEnv = z.infer<
   typeof firebaseAdminEnvSchema
 >;
+
+export const securityEnvSchema = z.object({
+  EMPLOYEE_PIN_PEPPER: z.string().min(64),
+});
+
+export type SecurityEnv =
+  z.infer<typeof securityEnvSchema>;

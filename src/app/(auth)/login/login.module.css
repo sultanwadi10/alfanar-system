@@ -1,0 +1,287 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(8, 126, 139, 0.12),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      #f6f9fb 0%,
+      #edf3f6 100%
+    );
+  color: #17212b;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 460px;
+  overflow: hidden;
+  border: 1px solid #dce5ea;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow:
+    0 24px 70px
+    rgba(23, 33, 43, 0.12);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 30px 30px 24px;
+  border-bottom: 1px solid #edf2f5;
+}
+
+.brandMark {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  border-radius: 17px;
+  background: #087e8b;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.companyName {
+  margin: 0 0 4px;
+  color: #087e8b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: #74808b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.loginTypeSelector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 24px 30px 0;
+  padding: 5px;
+  border-radius: 14px;
+  background: #eef3f5;
+}
+
+.typeButton,
+.activeType {
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.typeButton {
+  background: transparent;
+  color: #6a7680;
+}
+
+.activeType {
+  background: #ffffff;
+  color: #087e8b;
+  box-shadow:
+    0 4px 12px
+    rgba(23, 33, 43, 0.08);
+}
+
+.contextBox {
+  display: grid;
+  gap: 4px;
+  margin: 18px 30px 0;
+  border: 1px solid #dce9eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f4fafb;
+}
+
+.contextBox strong {
+  color: #176b74;
+  font-size: 13px;
+}
+
+.contextBox span {
+  color: #697680;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+  padding: 24px 30px 30px;
+}
+
+.form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.form input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  border: 1px solid #ced9df;
+  border-radius: 12px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #17212b;
+  caret-color: #17212b;
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.form input::placeholder {
+  color: #9aa4ad;
+}
+
+.form input:focus {
+  border-color: #087e8b;
+  box-shadow:
+    0 0 0 3px
+    rgba(8, 126, 139, 0.12);
+}
+
+.passwordField {
+  display: flex;
+  gap: 8px;
+}
+
+.passwordField input {
+  flex: 1;
+}
+
+.showPasswordButton {
+  min-width: 66px;
+  border: 1px solid #ced9df;
+  border-radius: 12px;
+  padding: 0 10px;
+  background: #f8fafb;
+  color: #34414d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.showPasswordButton:hover:not(:disabled) {
+  background: #eef3f5;
+}
+
+.loginButton {
+  min-height: 50px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 18px;
+  background: #087e8b;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.loginButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 24px
+    rgba(8, 126, 139, 0.2);
+}
+
+.loginButton:disabled,
+.showPasswordButton:disabled,
+.typeButton:disabled,
+.activeType:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.errorMessage {
+  border: 1px solid #f0cccc;
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: #fff1f1;
+  color: #a13a3a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  border-top: 1px solid #edf2f5;
+  padding: 15px 20px;
+  color: #8a959e;
+  font-size: 11px;
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 14px;
+  }
+
+  .header {
+    padding:
+      24px 20px
+      20px;
+  }
+
+  .header h1 {
+    font-size: 23px;
+  }
+
+  .loginTypeSelector {
+    margin:
+      20px 20px
+      0;
+  }
+
+  .contextBox {
+    margin:
+      16px 20px
+      0;
+  }
+
+  .form {
+    padding:
+      22px 20px
+      24px;
+  }
+
+  .passwordField {
+    align-items: stretch;
+  }
+}

@@ -7,6 +7,7 @@ import {
   type App,
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 import { getFirebaseAdminEnv } from "@/lib/validation/server-env";
 
@@ -30,4 +31,8 @@ export function getFirebaseAdminApp(): App {
 
 export function getFirebaseAdminAuth() {
   return getAuth(getFirebaseAdminApp());
+}
+
+export function getFirebaseAdminFirestore() {
+  return getFirestore(getFirebaseAdminApp());
 }
