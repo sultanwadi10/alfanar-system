@@ -4,67 +4,118 @@
   place-items: center;
   overflow: hidden;
   overscroll-behavior: none;
-  padding:
-    max(24px, env(safe-area-inset-top))
-    max(24px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom))
-    max(24px, env(safe-area-inset-left));
   box-sizing: border-box;
-  background: #0b0d10;
-  color: #f5f7fa;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(
+      circle at 50% -20%,
+      #242832 0,
+      #15181e 36%,
+      #0d0f13 100%
+    );
+  color: #f7f8fa;
   user-select: none;
-  cursor: default;
   -webkit-tap-highlight-color:
     transparent;
 }
 
-.clock {
+.calculator {
+  width: min(100%, 390px);
   display: grid;
-  justify-items: center;
-  gap: 22px;
-  text-align: center;
-  touch-action: manipulation;
+  gap: 18px;
 }
 
-.time {
+.display {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  min-width: 0;
+  padding: 20px 8px 8px;
+  box-sizing: border-box;
+}
+
+.display output {
+  width: 100%;
+  overflow: hidden;
+  color: #f8fafc;
   font-size:
     clamp(
-      4rem,
-      16vw,
-      9rem
+      3.1rem,
+      13vw,
+      5.2rem
     );
-  font-weight: 250;
-  line-height: 0.95;
+  font-weight: 320;
+  line-height: 1;
   letter-spacing: -0.055em;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-variant-numeric:
     tabular-nums;
 }
 
-.dateBlock {
+.operationHint {
+  min-height: 24px;
+  color: #8c939e;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.keypad {
   display: grid;
-  gap: 6px;
-  color: #9da5ae;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 11px;
 }
 
-.dateBlock span {
-  font-size:
-    clamp(
-      1.1rem,
-      3vw,
-      1.55rem
-    );
-  font-weight: 500;
+.key {
+  min-width: 0;
+  min-height: 68px;
+  border: 0;
+  border-radius: 22px;
+  background: #242830;
+  color: #f4f6f8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.55rem;
+  font-weight: 560;
+  line-height: 1;
+  touch-action: manipulation;
+  transition:
+    transform 90ms ease,
+    filter 90ms ease,
+    background 120ms ease;
 }
 
-.dateBlock strong {
-  color: #d8dde3;
-  font-size:
-    clamp(
-      0.95rem,
-      2.5vw,
-      1.25rem
-    );
-  font-weight: 400;
+.key:active {
+  transform: scale(0.965);
+  filter: brightness(1.18);
+}
+
+.key:focus-visible {
+  outline: 3px solid #8da2c0;
+  outline-offset: 2px;
+}
+
+.utility {
+  background: #3b414b;
+  color: #f8fafc;
+}
+
+.operator {
+  background: #d98422;
+  color: #ffffff;
+}
+
+.equals {
+  background: #e29333;
+  color: #ffffff;
 }
 
 .pairingOverlay {
@@ -75,8 +126,8 @@
   place-items: center;
   padding: 20px;
   background:
-    rgba(4, 7, 10, 0.84);
-  backdrop-filter: blur(12px);
+    rgba(4, 7, 10, 0.88);
+  backdrop-filter: blur(14px);
   user-select: text;
 }
 
@@ -202,14 +253,29 @@
 @media (max-width: 600px) {
   .page {
     padding:
-      max(16px, env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right))
-      max(16px, env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
+      max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
 
-  .clock {
-    gap: 18px;
+  .calculator {
+    gap: 12px;
+  }
+
+  .display {
+    min-height: 128px;
+    padding-top: 10px;
+  }
+
+  .keypad {
+    gap: 9px;
+  }
+
+  .key {
+    min-height: 62px;
+    border-radius: 19px;
+    font-size: 1.42rem;
   }
 
   .pairingOverlay {
@@ -221,8 +287,26 @@
   }
 }
 
+@media (max-width: 360px) {
+  .key {
+    min-height: 56px;
+    border-radius: 17px;
+    font-size: 1.3rem;
+  }
+
+  .display {
+    min-height: 112px;
+  }
+}
+
 @media (display-mode: standalone) {
   .page {
     min-height: 100dvh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key {
+    transition: none;
   }
 }

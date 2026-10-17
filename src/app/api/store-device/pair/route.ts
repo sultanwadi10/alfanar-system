@@ -15,6 +15,9 @@ import {
   PairingRateLimitedError,
 } from "@/lib/store/store-device-pairing-repository";
 import {
+  requireCurrentStoreStealthAccess,
+} from "@/lib/store/store-stealth-access";
+import {
   getStoreRuntimeState,
   STORE_RUNTIME_STATUSES,
 } from "@/lib/store/store-runtime-repository";
@@ -62,29 +65,10 @@ export async function POST(
       request,
     )
   ) {
-    return NextResponse.json(
-      {
-        success: false,
-
-        error: {
-          code:
-            "FORBIDDEN",
-
-          message:
-            "Request denied.",
-        },
-      },
-      {
-        status: 403,
-      },
-    );
+    return createHiddenResponse();
   }
 
   try {
-    /*
-     * Pairing is impossible while the Kill Switch is active.
-     * This is enforced server-side even if someone calls this route directly.
-     */
     const runtime =
       await getStoreRuntimeState();
 
@@ -94,6 +78,10 @@ export async function POST(
     ) {
       return createHiddenResponse();
     }
+
+    await requireCurrentStoreStealthAccess(
+      runtime,
+    );
 
     const body =
       requestSchema.parse(
@@ -193,21 +181,6 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(
-      {
-        success: false,
-
-        error: {
-          code:
-            "PAIRING_FAILED",
-
-          message:
-            "Unable to connect this device.",
-        },
-      },
-      {
-        status: 400,
-      },
-    );
+    return createHiddenResponse();
   }
 }

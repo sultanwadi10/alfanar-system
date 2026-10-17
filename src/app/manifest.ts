@@ -4,21 +4,21 @@ import type {
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Clock",
-    short_name: "Clock",
+    name: "Calculator",
+    short_name: "Calculator",
     description:
-      "Time and date",
+      "Calculator",
     start_url: "/",
     scope: "/",
     display: "standalone",
     background_color:
-      "#0b0d10",
+      "#0d0f13",
     theme_color:
-      "#0b0d10",
+      "#0d0f13",
     icons: [
       {
         src:
-          "/clock-192.png",
+          "/calculator-192.png",
         sizes:
           "192x192",
         type:
@@ -28,7 +28,7 @@ export default function manifest(): MetadataRoute.Manifest {
       },
       {
         src:
-          "/clock-512.png",
+          "/calculator-512.png",
         sizes:
           "512x512",
         type:
@@ -38,7 +38,7 @@ export default function manifest(): MetadataRoute.Manifest {
       },
       {
         src:
-          "/clock-maskable-512.png",
+          "/calculator-maskable-512.png",
         sizes:
           "512x512",
         type:

@@ -22,14 +22,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clock",
+  title: "Calculator",
   description:
-    "Time and date",
+    "Calculator",
   applicationName:
-    "Clock",
+    "Calculator",
   appleWebApp: {
     capable: true,
-    title: "Clock",
+    title: "Calculator",
     statusBarStyle:
       "black-translucent",
   },
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     icon: [
       {
         url:
-          "/clock-192.png",
+          "/calculator-192.png",
         sizes:
           "192x192",
         type:
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
       },
       {
         url:
-          "/clock-512.png",
+          "/calculator-512.png",
         sizes:
           "512x512",
         type:
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     apple: [
       {
         url:
-          "/clock-180.png",
+          "/calculator-180.png",
         sizes:
           "180x180",
         type:
@@ -81,7 +81,7 @@ export const viewport: Viewport = {
   viewportFit:
     "cover",
   themeColor:
-    "#0b0d10",
+    "#0d0f13",
   colorScheme:
     "dark",
 };

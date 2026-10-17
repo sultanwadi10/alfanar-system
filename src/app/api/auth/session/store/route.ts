@@ -31,6 +31,11 @@ import {
   requirePairedStoreDevice,
 } from "@/lib/store/store-device-repository";
 import {
+  requireCurrentStoreStealthAccess,
+  revokeCurrentStoreStealthAccess,
+  STORE_STEALTH_ACCESS_CONFIG,
+} from "@/lib/store/store-stealth-access";
+import {
   getStoreRuntimeState,
   isStoreSessionAllowed,
   STORE_RUNTIME_STATUSES,
@@ -86,6 +91,29 @@ function clearStoreCookies(
   );
 }
 
+function clearStealthCookie(
+  response: NextResponse,
+) {
+  response.cookies.set(
+    STORE_STEALTH_ACCESS_CONFIG
+      .COOKIE_NAME,
+    "",
+    {
+      httpOnly: true,
+
+      secure:
+        process.env.NODE_ENV ===
+        "production",
+
+      sameSite: "strict",
+
+      path: "/",
+
+      maxAge: 0,
+    },
+  );
+}
+
 function createUnavailableResponse() {
   const response =
     NextResponse.json(
@@ -106,6 +134,10 @@ function createUnavailableResponse() {
     );
 
   clearStoreCookies(
+    response,
+  );
+
+  clearStealthCookie(
     response,
   );
 
@@ -139,11 +171,30 @@ export async function POST(
       );
     }
 
-    /*
-     * Knowing the Store Firebase credentials is not enough.
-     * The browser itself must first be paired by Admin.
-     */
+    const runtimeBefore =
+      await getStoreRuntimeState();
+
+    if (
+      runtimeBefore.status ===
+      STORE_RUNTIME_STATUSES.STOPPED
+    ) {
+      try {
+        await revokeCurrentOperatorSession();
+      } catch (error) {
+        console.error(
+          "Failed to revoke operator session while store runtime is stopped:",
+          error,
+        );
+      }
+
+      return createUnavailableResponse();
+    }
+
     await requirePairedStoreDevice();
+
+    await requireCurrentStoreStealthAccess(
+      runtimeBefore,
+    );
 
     const body =
       requestSchema.parse(
@@ -193,25 +244,6 @@ export async function POST(
       );
     }
 
-    const runtimeBefore =
-      await getStoreRuntimeState();
-
-    if (
-      runtimeBefore.status ===
-      STORE_RUNTIME_STATUSES.STOPPED
-    ) {
-      try {
-        await revokeCurrentOperatorSession();
-      } catch (error) {
-        console.error(
-          "Failed to revoke operator session while store runtime is stopped:",
-          error,
-        );
-      }
-
-      return createUnavailableResponse();
-    }
-
     await revokeCurrentOperatorSession();
 
     const sessionCookie =
@@ -243,10 +275,11 @@ export async function POST(
       return createUnavailableResponse();
     }
 
-    /*
-     * Protect against device revocation during the login request.
-     */
     await requirePairedStoreDevice();
+
+    await requireCurrentStoreStealthAccess(
+      runtimeAfter,
+    );
 
     const response =
       NextResponse.json({
@@ -299,6 +332,12 @@ export async function POST(
               1000,
           ),
       },
+    );
+
+    await revokeCurrentStoreStealthAccess();
+
+    clearStealthCookie(
+      response,
     );
 
     return response;

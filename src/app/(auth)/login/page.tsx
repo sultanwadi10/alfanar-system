@@ -6,6 +6,10 @@ import {
   resolvePairedStoreDevice,
 } from "@/lib/store/store-device-repository";
 import {
+  isStoreStealthAccessAllowed,
+  resolveCurrentStoreStealthAccess,
+} from "@/lib/store/store-stealth-access";
+import {
   getStoreRuntimeState,
   STORE_RUNTIME_STATUSES,
 } from "@/lib/store/store-runtime-repository";
@@ -62,6 +66,10 @@ export default async function LoginPage({
     requestedTarget ===
     "admin"
   ) {
+    if (pairedDevice) {
+      redirect("/");
+    }
+
     target = "admin";
   } else {
     target = pairedDevice
@@ -82,6 +90,22 @@ export default async function LoginPage({
       !runtime ||
       runtime.status ===
         STORE_RUNTIME_STATUSES.STOPPED
+    ) {
+      redirect("/");
+    }
+
+    const stealthAccess =
+      await resolveCurrentStoreStealthAccess()
+        .catch(
+          () => null,
+        );
+
+    if (
+      !stealthAccess ||
+      !isStoreStealthAccessAllowed(
+        stealthAccess,
+        runtime,
+      )
     ) {
       redirect("/");
     }

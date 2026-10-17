@@ -9,6 +9,12 @@ import {
   resolvePairedStoreDevice,
 } from "@/lib/store/store-device-repository";
 import {
+  isStoreStealthAccessAllowed,
+  resolveCurrentStoreStealthAccess,
+  revokeCurrentStoreStealthAccess,
+  STORE_STEALTH_ACCESS_CONFIG,
+} from "@/lib/store/store-stealth-access";
+import {
   getStoreRuntimeState,
   STORE_RUNTIME_STATUSES,
 } from "@/lib/store/store-runtime-repository";
@@ -32,20 +38,50 @@ function createNeutralResponse() {
   );
 }
 
+function clearStealthCookie(
+  response: NextResponse,
+) {
+  response.cookies.set(
+    STORE_STEALTH_ACCESS_CONFIG
+      .COOKIE_NAME,
+    "",
+    {
+      httpOnly: true,
+
+      secure:
+        process.env.NODE_ENV ===
+        "production",
+
+      sameSite: "strict",
+
+      path: "/",
+
+      maxAge: 0,
+    },
+  );
+}
+
 export async function GET() {
   try {
-    /*
-     * Runtime is checked before device state.
-     *
-     * STOPPED means the public surface stays completely neutral:
-     * no login, no pairing prompt, and no device-state disclosure.
-     */
     const runtime =
       await getStoreRuntimeState();
 
     if (
       runtime.status ===
       STORE_RUNTIME_STATUSES.STOPPED
+    ) {
+      return createNeutralResponse();
+    }
+
+    const access =
+      await resolveCurrentStoreStealthAccess();
+
+    if (
+      !access ||
+      !isStoreStealthAccessAllowed(
+        access,
+        runtime,
+      )
     ) {
       return createNeutralResponse();
     }
@@ -78,21 +114,31 @@ export async function GET() {
       // A paired device without a valid Store session must sign in again.
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        mode: "ENTER",
-        destination,
-      },
-      {
-        headers:
-          NO_STORE_HEADERS,
-      },
-    );
+    const response =
+      NextResponse.json(
+        {
+          success: true,
+          mode: "ENTER",
+          destination,
+        },
+        {
+          headers:
+            NO_STORE_HEADERS,
+        },
+      );
+
+    if (
+      destination ===
+      "/employee"
+    ) {
+      await revokeCurrentStoreStealthAccess();
+      clearStealthCookie(
+        response,
+      );
+    }
+
+    return response;
   } catch {
-    /*
-     * Fail closed. Runtime/storage failures never reveal Store UI.
-     */
     return createNeutralResponse();
   }
 }
