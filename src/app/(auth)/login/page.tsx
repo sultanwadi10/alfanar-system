@@ -1,324 +1,95 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  browserSessionPersistence,
-  setPersistence,
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
+  redirect,
+} from "next/navigation";
 
-import { getFirebaseClientAuth } from "@/lib/firebase/client";
+import {
+  resolvePairedStoreDevice,
+} from "@/lib/store/store-device-repository";
+import {
+  getStoreRuntimeState,
+  STORE_RUNTIME_STATUSES,
+} from "@/lib/store/store-runtime-repository";
 
-import styles from "./login.module.css";
+import {
+  LoginForm,
+} from "./login-form";
 
-type LoginTarget = "admin" | "store";
+type LoginTarget =
+  | "admin"
+  | "store";
 
-export default function LoginPage() {
-  const router = useRouter();
+type LoginPageProps = {
+  searchParams:
+    Promise<{
+      target?:
+        string |
+        string[];
+    }>;
+};
 
-  const [target, setTarget] =
-    useState<LoginTarget>("admin");
+export default async function LoginPage({
+  searchParams,
+}: LoginPageProps) {
+  const params =
+    await searchParams;
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] =
-    useState("");
+  const requestedTarget =
+    Array.isArray(
+      params.target,
+    )
+      ? params.target[0]
+      : params.target;
 
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const pairedDevice =
+    await resolvePairedStoreDevice()
+      .catch(
+        () => null,
+      );
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  let target:
+    LoginTarget;
 
-  const [loading, setLoading] =
-    useState(false);
-
-  async function handleLogin(
-    event: React.FormEvent<HTMLFormElement>,
+  if (
+    requestedTarget ===
+    "store"
   ) {
-    event.preventDefault();
+    if (!pairedDevice) {
+      redirect("/");
+    }
 
-    setLoading(true);
-    setErrorMessage("");
+    target = "store";
+  } else if (
+    requestedTarget ===
+    "admin"
+  ) {
+    target = "admin";
+  } else {
+    target = pairedDevice
+      ? "store"
+      : "admin";
+  }
 
-    try {
-      const auth =
-        getFirebaseClientAuth();
-
-      await setPersistence(
-        auth,
-        browserSessionPersistence,
-      );
-
-      const credential =
-        await signInWithEmailAndPassword(
-          auth,
-          email.trim(),
-          password,
+  if (
+    target === "store"
+  ) {
+    const runtime =
+      await getStoreRuntimeState()
+        .catch(
+          () => null,
         );
 
-      const idToken =
-        await credential.user.getIdToken(
-          true,
-        );
-
-      const endpoint =
-        target === "admin"
-          ? "/api/auth/session/admin"
-          : "/api/auth/session/store";
-
-      const response = await fetch(
-        endpoint,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            idToken,
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      await signOut(auth);
-
-      if (
-        !response.ok ||
-        data.success !== true
-      ) {
-        setErrorMessage(
-          target === "admin"
-            ? "تعذر تسجيل الدخول كمسؤول. تأكد من الحساب والصلاحية."
-            : "تعذر تسجيل الدخول إلى حساب المحل. تأكد من الحساب والصلاحية.",
-        );
-
-        return;
-      }
-
-      router.replace(
-        target === "admin"
-          ? "/admin"
-          : "/employee",
-      );
-
-      router.refresh();
-    } catch {
-      setErrorMessage(
-        "بيانات تسجيل الدخول غير صحيحة أو تعذر الاتصال بالخدمة.",
-      );
-    } finally {
-      setLoading(false);
+    if (
+      !runtime ||
+      runtime.status ===
+        STORE_RUNTIME_STATUSES.STOPPED
+    ) {
+      redirect("/");
     }
   }
 
   return (
-    <main
-      className={styles.page}
-      dir="rtl"
-    >
-      <section
-        className={styles.loginCard}
-      >
-        <header
-          className={styles.header}
-        >
-          <div className={styles.brandMark}>
-            A
-          </div>
-
-          <div>
-            <p
-              className={
-                styles.companyName
-              }
-            >
-              GLE TECHNOLOGY
-            </p>
-
-            <h1>نظام محطة الفنار</h1>
-
-            <p
-              className={
-                styles.subtitle
-              }
-            >
-              تسجيل الدخول إلى النظام
-              الإداري والتشغيلي
-            </p>
-          </div>
-        </header>
-
-        <div
-          className={
-            styles.loginTypeSelector
-          }
-        >
-          <button
-            type="button"
-            className={
-              target === "admin"
-                ? styles.activeType
-                : styles.typeButton
-            }
-            onClick={() =>
-              setTarget("admin")
-            }
-            disabled={loading}
-          >
-            الإدارة
-          </button>
-
-          <button
-            type="button"
-            className={
-              target === "store"
-                ? styles.activeType
-                : styles.typeButton
-            }
-            onClick={() =>
-              setTarget("store")
-            }
-            disabled={loading}
-          >
-            المحل
-          </button>
-        </div>
-
-        <div
-          className={styles.contextBox}
-        >
-          {target === "admin" ? (
-            <>
-              <strong>
-                دخول الإدارة
-              </strong>
-
-              <span>
-                مخصص لصاحب المحطة
-                والإدارة.
-              </span>
-            </>
-          ) : (
-            <>
-              <strong>
-                دخول المحل
-              </strong>
-
-              <span>
-                يفتح بيئة المحل،
-                وبعدها يتم اختيار
-                الموظف باستخدام PIN.
-              </span>
-            </>
-          )}
-        </div>
-
-        <form
-          className={styles.form}
-          onSubmit={handleLogin}
-        >
-          <label>
-            البريد الإلكتروني
-
-            <input
-              type="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(
-                  event.target.value,
-                )
-              }
-              placeholder="example@email.com"
-              autoComplete="email"
-              disabled={loading}
-              required
-            />
-          </label>
-
-          <label>
-            كلمة المرور
-
-            <div
-              className={
-                styles.passwordField
-              }
-            >
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={password}
-                onChange={(event) =>
-                  setPassword(
-                    event.target.value,
-                  )
-                }
-                placeholder="أدخل كلمة المرور"
-                autoComplete="current-password"
-                disabled={loading}
-                required
-              />
-
-              <button
-                type="button"
-                className={
-                  styles.showPasswordButton
-                }
-                onClick={() =>
-                  setShowPassword(
-                    (current) =>
-                      !current,
-                  )
-                }
-                disabled={loading}
-              >
-                {showPassword
-                  ? "إخفاء"
-                  : "إظهار"}
-              </button>
-            </div>
-          </label>
-
-          {errorMessage && (
-            <div
-              className={
-                styles.errorMessage
-              }
-              role="alert"
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className={
-              styles.loginButton
-            }
-            disabled={loading}
-          >
-            {loading
-              ? "جاري تسجيل الدخول..."
-              : target === "admin"
-                ? "دخول الإدارة"
-                : "دخول المحل"}
-          </button>
-        </form>
-
-        <footer
-          className={styles.footer}
-        >
-          Alfanar Water Station
-          <span>•</span>
-          GLE TECHNOLOGY
-        </footer>
-      </section>
-    </main>
+    <LoginForm
+      target={target}
+    />
   );
 }

@@ -5,26 +5,32 @@ import { createFirebaseSessionCookie } from "@/lib/auth/create-firebase-session-
 import { requirePrincipalType } from "@/lib/auth/require-principal-type";
 import { AUTH_SESSION_CONFIG } from "@/lib/auth/session-config";
 import { verifyFirebaseIdToken } from "@/lib/auth/verify-id-token";
+import { hasValidOrigin } from "@/lib/security/has-valid-origin";
 import { AUTH_PRINCIPAL_TYPES } from "@/types/auth";
 
 const requestSchema = z.object({
   idToken: z.string().min(1),
 });
 
-
-
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+) {
   try {
-    const origin = request.headers.get("origin");
-    const requestOrigin = new URL(request.url).origin;
-
-    if (!origin || origin !== requestOrigin) {
+    if (
+      !hasValidOrigin(
+        request,
+      )
+    ) {
       return NextResponse.json(
         {
           success: false,
+
           error: {
-            code: "INVALID_ORIGIN",
-            message: "The request origin is not allowed.",
+            code:
+              "INVALID_ORIGIN",
+
+            message:
+              "The request origin is not allowed.",
           },
         },
         {
@@ -33,29 +39,46 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = requestSchema.parse(await request.json());
+    const body =
+      requestSchema.parse(
+        await request.json(),
+      );
 
-    const decodedToken = await verifyFirebaseIdToken(body.idToken);
+    const decodedToken =
+      await verifyFirebaseIdToken(
+        body.idToken,
+      );
 
     requirePrincipalType(
       decodedToken,
       AUTH_PRINCIPAL_TYPES.ADMIN_ACCOUNT,
     );
 
-    const currentTimeSeconds = Math.floor(Date.now() / 1000);
+    const currentTimeSeconds =
+      Math.floor(
+        Date.now() /
+          1000,
+      );
+
     const signInAgeSeconds =
-      currentTimeSeconds - decodedToken.auth_time;
+      currentTimeSeconds -
+      decodedToken.auth_time;
 
     if (
       signInAgeSeconds >
-      AUTH_SESSION_CONFIG.RECENT_SIGN_IN_MAX_AGE_SECONDS
+      AUTH_SESSION_CONFIG
+        .RECENT_SIGN_IN_MAX_AGE_SECONDS
     ) {
       return NextResponse.json(
         {
           success: false,
+
           error: {
-            code: "RECENT_SIGN_IN_REQUIRED",
-            message: "A recent sign-in is required.",
+            code:
+              "RECENT_SIGN_IN_REQUIRED",
+
+            message:
+              "A recent sign-in is required.",
           },
         },
         {
@@ -64,40 +87,59 @@ export async function POST(request: Request) {
       );
     }
 
-    const sessionCookie = await createFirebaseSessionCookie(
-      body.idToken,
-      AUTH_SESSION_CONFIG.ADMIN_EXPIRES_IN_MS,
-    );
+    const sessionCookie =
+      await createFirebaseSessionCookie(
+        body.idToken,
+        AUTH_SESSION_CONFIG
+          .ADMIN_EXPIRES_IN_MS,
+      );
 
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        principalType: AUTH_PRINCIPAL_TYPES.ADMIN_ACCOUNT,
+    const response =
+      NextResponse.json({
+        success: true,
+
+        data: {
+          principalType:
+            AUTH_PRINCIPAL_TYPES.ADMIN_ACCOUNT,
+        },
+      });
+
+    response.cookies.set(
+      AUTH_SESSION_CONFIG
+        .COOKIE_NAMES.ADMIN,
+      sessionCookie,
+      {
+        httpOnly: true,
+
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+
+        sameSite: "lax",
+
+        path: "/",
+
+        maxAge:
+          Math.floor(
+            AUTH_SESSION_CONFIG
+              .ADMIN_EXPIRES_IN_MS /
+              1000,
+          ),
       },
-    });
-
-  response.cookies.set(
-  AUTH_SESSION_CONFIG.COOKIE_NAMES.ADMIN,
-  sessionCookie,
-  {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: Math.floor(
-      AUTH_SESSION_CONFIG.ADMIN_EXPIRES_IN_MS / 1000,
-    ),
-  },
-);
+    );
 
     return response;
   } catch {
     return NextResponse.json(
       {
         success: false,
+
         error: {
-          code: "AUTHENTICATION_FAILED",
-          message: "The admin session could not be created.",
+          code:
+            "AUTHENTICATION_FAILED",
+
+          message:
+            "The admin session could not be created.",
         },
       },
       {

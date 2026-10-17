@@ -5,6 +5,7 @@ import {
   updateProductRecord,
 } from "@/lib/products/product-repository";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
+import { hasValidOrigin } from "@/lib/security/has-valid-origin";
 import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { productMutationSchema } from "@/lib/validation/product";
@@ -15,25 +16,6 @@ type RouteContext = {
   }>;
 };
 
-function hasValidOrigin(
-  request: Request,
-) {
-  const origin =
-    request.headers.get(
-      "origin",
-    );
-
-  if (!origin) {
-    return false;
-  }
-
-  return (
-    origin ===
-    new URL(
-      request.url,
-    ).origin
-  );
-}
 
 export async function PATCH(
   request: Request,

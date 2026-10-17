@@ -1,0 +1,28 @@
+export const STORE_DEVICE_CONFIG = {
+  COOKIE_NAME:
+    "workspace_device",
+
+  COOKIE_VERSION:
+    "v1",
+
+  TOKEN_BYTES: 32,
+
+  MAX_AGE_SECONDS:
+    180 * 24 * 60 * 60,
+
+  LAST_SEEN_UPDATE_INTERVAL_MS:
+    5 * 60 * 1000,
+
+  PAIRING_CODE_DIGITS: 8,
+
+  PAIRING_CODE_EXPIRES_IN_MS:
+    3 * 60 * 1000,
+
+  PAIRING_ATTEMPT_WINDOW_MS:
+    10 * 60 * 1000,
+
+  PAIRING_MAX_ATTEMPTS: 8,
+
+  PAIRING_BLOCK_MS:
+    15 * 60 * 1000,
+} as const;

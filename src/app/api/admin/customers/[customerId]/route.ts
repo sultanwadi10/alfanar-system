@@ -6,6 +6,7 @@ import {
   updateCustomerRecord,
 } from "@/lib/customers/customer-repository";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
+import { hasValidOrigin } from "@/lib/security/has-valid-origin";
 import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { updateCustomerSchema } from "@/lib/validation/customer";
@@ -24,15 +25,10 @@ export async function PATCH(
     const securityContext =
       await getAdminSecurityContext();
 
-    const origin =
-      request.headers.get("origin");
-
-    const requestOrigin =
-      new URL(request.url).origin;
-
     if (
-      !origin ||
-      origin !== requestOrigin
+      !hasValidOrigin(
+        request,
+      )
     ) {
       return NextResponse.json(
         {

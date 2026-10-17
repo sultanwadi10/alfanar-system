@@ -1,0 +1,613 @@
+.page {
+  width: min(1050px, 100%);
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.pageHeader > span {
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.pageHeader h1 {
+  margin: 5px 0;
+  color: var(--color-text);
+  font-size: 1.8rem;
+}
+
+.pageHeader p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.runtimeCard {
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow:
+    0 12px 35px
+    rgba(15, 23, 42, 0.06);
+}
+
+.runtimeHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.sectionLabel {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.runtimeHeader h2 {
+  margin: 4px 0 0;
+  color: var(--color-text);
+  font-size: 1.35rem;
+}
+
+.runningBadge,
+.stoppedBadge {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.runningBadge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stoppedBadge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+:global(html[data-theme="dark"])
+.runningBadge {
+  background: #163b2a;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"])
+.stoppedBadge {
+  background: #442326;
+  color: #fca5a5;
+}
+
+.runningBadge span,
+.stoppedBadge span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.runningBadge span {
+  background: #22c55e;
+}
+
+.stoppedBadge span {
+  background: #ef4444;
+}
+
+.runtimeDescription {
+  padding: 18px;
+  margin-top: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-secondary);
+}
+
+.runtimeDescription strong {
+  display: block;
+  color: var(--color-text);
+}
+
+.runtimeDescription p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+
+.securityInfo {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.securityInfo > div {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-secondary);
+}
+
+.securityInfo span,
+.securityInfo strong {
+  display: block;
+}
+
+.securityInfo span {
+  margin-bottom: 5px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.securityInfo strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+}
+
+.runtimeActions {
+  margin-top: 20px;
+}
+
+.stopButton,
+.startButton {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.stopButton {
+  background: #b91c1c;
+}
+
+.stopButton:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+.startButton {
+  background: #15803d;
+}
+
+.startButton:hover:not(:disabled) {
+  background: #166534;
+}
+
+.stopButton:disabled,
+.startButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.errorBox,
+.successBox {
+  padding: 12px 14px;
+  margin-top: 15px;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.errorBox {
+  border: 1px solid #b91c1c;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.successBox {
+  border: 1px solid #15803d;
+  background: #dcfce7;
+  color: #166534;
+}
+
+:global(html[data-theme="dark"])
+.errorBox {
+  background: #442326;
+  color: #fca5a5;
+}
+
+:global(html[data-theme="dark"])
+.successBox {
+  background: #163b2a;
+  color: #86efac;
+}
+
+.warningBox {
+  padding: 14px;
+  margin-top: 18px;
+  border-right: 3px solid #d97706;
+  border-radius: 10px;
+  background: var(--color-surface-secondary);
+}
+
+.warningBox strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.warningBox p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 700px) {
+  .runtimeHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .securityInfo {
+    grid-template-columns: 1fr;
+  }
+
+  .stopButton,
+  .startButton {
+    width: 100%;
+  }
+
+  .runtimeCard {
+    padding: 18px;
+  }
+}
+
+
+.settingsStack {
+  display: grid;
+  gap: 22px;
+}
+
+.deviceCard {
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow:
+    0 12px 35px
+    rgba(15, 23, 42, 0.06);
+}
+
+.deviceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.deviceHeader h2 {
+  margin: 4px 0 0;
+  color: var(--color-text);
+  font-size: 1.35rem;
+}
+
+.deviceHeader p {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.7;
+}
+
+.deviceCount {
+  min-width: 92px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.deviceCount span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.deviceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.pairButton,
+.secondaryButton,
+.revokeButton {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 11px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.pairButton {
+  border: 0;
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text);
+}
+
+.revokeButton {
+  min-height: 38px;
+  border: 1px solid #dc2626;
+  background: transparent;
+  color: #b91c1c;
+}
+
+:global(html[data-theme="dark"])
+.revokeButton {
+  color: #fca5a5;
+}
+
+.pairButton:disabled,
+.secondaryButton:disabled,
+.revokeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pairingCodePanel {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--color-primary);
+  border-radius: 15px;
+  background: var(--color-surface-secondary);
+}
+
+.pairingCodePanel > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.pairingCodePanel span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pairingCodePanel > div:first-child strong {
+  color: var(--color-text);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  letter-spacing: 0.09em;
+  direction: ltr;
+  text-align: right;
+}
+
+.pairingCodePanel > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.pairingTimer {
+  min-width: 95px;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.pairingTimer strong {
+  color: var(--color-text);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 1.05rem;
+}
+
+.deviceList {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.deviceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  background: var(--color-surface-secondary);
+}
+
+.deviceIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.deviceIcon,
+.deviceIconRevoked {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-weight: 900;
+}
+
+.deviceIcon {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.deviceIconRevoked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+:global(html[data-theme="dark"])
+.deviceIcon {
+  background: #163b2a;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"])
+.deviceIconRevoked {
+  background: #442326;
+  color: #fca5a5;
+}
+
+.deviceIdentity > div:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.deviceIdentity strong {
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deviceIdentity span {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+}
+
+.deviceStatusArea {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activeDeviceBadge,
+.revokedDeviceBadge {
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.activeDeviceBadge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.revokedDeviceBadge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+:global(html[data-theme="dark"])
+.activeDeviceBadge {
+  background: #163b2a;
+  color: #86efac;
+}
+
+:global(html[data-theme="dark"])
+.revokedDeviceBadge {
+  background: #442326;
+  color: #fca5a5;
+}
+
+.deviceEmpty {
+  padding: 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.deviceSecurityNote {
+  padding: 14px;
+  margin-top: 18px;
+  border-right: 3px solid var(--color-primary);
+  border-radius: 10px;
+  background: var(--color-surface-secondary);
+}
+
+.deviceSecurityNote strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.deviceSecurityNote p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 700px) {
+  .deviceCard {
+    padding: 18px;
+  }
+
+  .deviceHeader,
+  .deviceRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .deviceCount {
+    width: fit-content;
+  }
+
+  .deviceActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .pairButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .pairingCodePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .pairingTimer {
+    width: fit-content;
+  }
+
+  .pairingCodePanel > p {
+    grid-column: 1;
+  }
+
+  .deviceStatusArea {
+    justify-content: space-between;
+  }
+}

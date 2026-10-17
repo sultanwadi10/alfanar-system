@@ -1,0 +1,434 @@
+.section {
+  max-width: 1200px;
+  margin: 24px auto 0;
+}
+
+.card {
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 20px;
+
+  background:
+    var(--color-surface);
+
+  box-shadow:
+    var(--shadow-card);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  padding: 22px 24px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.cardHeader h2 {
+  margin: 0 0 6px;
+
+  color:
+    var(--color-text);
+
+  font-size: 20px;
+}
+
+.cardHeader p {
+  margin: 0;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.settingsForm {
+  padding: 24px;
+}
+
+.shiftSettingsGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 18px;
+}
+
+.shiftGroup {
+  padding: 18px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 16px;
+
+  background:
+    var(--color-surface-secondary);
+}
+
+.shiftGroupTitle {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  margin-bottom: 15px;
+}
+
+.shiftDot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 999px;
+
+  background:
+    var(--color-primary);
+}
+
+.shiftGroupTitle strong {
+  color:
+    var(--color-text);
+}
+
+.timeGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 12px;
+}
+
+.timeField {
+  display: grid;
+  gap: 7px;
+
+  color:
+    var(--color-text);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.timeField input {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  min-height: 44px;
+
+  padding: 0 12px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 11px;
+
+  outline: none;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text);
+
+  font: inherit;
+}
+
+.timeField input:focus {
+  border-color:
+    var(--color-primary);
+
+  box-shadow:
+    0 0 0 3px
+    color-mix(
+      in srgb,
+      var(--color-primary) 16%,
+      transparent
+    );
+}
+
+.settingsFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  margin-top: 18px;
+}
+
+.settingsHint {
+  color:
+    var(--color-text-muted);
+
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.saveButton {
+  min-height: 42px;
+
+  flex: 0 0 auto;
+
+  padding:
+    0 16px;
+
+  border: 0;
+  border-radius: 11px;
+
+  background:
+    var(--color-primary);
+
+  color: #ffffff;
+
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.saveButton:hover:not(:disabled) {
+  background:
+    var(--color-primary-hover);
+}
+
+.saveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.scheduleIntro {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 13px;
+}
+
+.legendBadge {
+  padding:
+    5px 9px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 999px;
+
+  background:
+    var(--color-surface);
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.scheduleTable {
+  width: 100%;
+
+  min-width: 1080px;
+
+  border-collapse: collapse;
+}
+
+.scheduleTable th,
+.scheduleTable td {
+  padding:
+    14px 10px;
+
+  border-bottom:
+    1px solid
+    var(--color-border);
+
+  text-align: right;
+
+  vertical-align: middle;
+}
+
+.scheduleTable th {
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scheduleTable tbody tr {
+  background:
+    var(--color-surface);
+}
+
+.scheduleTable tbody tr:hover {
+  background:
+    var(--color-surface-secondary);
+}
+
+.scheduleTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.employeeCell {
+  min-width: 150px;
+}
+
+.employeeName {
+  display: block;
+
+  color:
+    var(--color-text);
+
+  font-weight: 800;
+}
+
+.employeeStatus {
+  display: block;
+
+  margin-top: 4px;
+
+  color:
+    var(--color-text-muted);
+
+  font-size: 11px;
+}
+
+.daySelect {
+  width: 100%;
+
+  min-width: 104px;
+  min-height: 38px;
+
+  padding:
+    0 9px;
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 9px;
+
+  outline: none;
+
+  background:
+    var(--color-surface-secondary);
+
+  color:
+    var(--color-text);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daySelect:focus {
+  border-color:
+    var(--color-primary);
+}
+
+.rowSaveButton {
+  min-height: 38px;
+
+  padding:
+    0 12px;
+
+  border:
+    1px solid
+    var(--color-primary);
+
+  border-radius: 9px;
+
+  background:
+    var(--color-primary-soft);
+
+  color:
+    var(--color-primary);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.rowSaveButton:hover:not(:disabled) {
+  background:
+    var(--color-primary);
+
+  color:
+    #ffffff;
+}
+
+.rowSaveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.emptySchedule {
+  padding: 38px 20px;
+
+  color:
+    var(--color-text-muted);
+
+  text-align: center;
+}
+
+@media (
+  max-width: 760px
+) {
+  .shiftSettingsGrid,
+  .timeGrid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .settingsFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .saveButton {
+    width: 100%;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

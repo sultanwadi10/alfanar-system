@@ -1,74 +1,184 @@
+import {
+  DashboardAutoRefresh,
+} from "@/components/admin/dashboard-auto-refresh";
+import {
+  getAdminDashboardData,
+} from "@/lib/admin/admin-dashboard-repository";
+
 import styles from "./page.module.css";
 
-const paymentMethods = [
-  {
-    title: "كاش",
-    value: "0.000 د.أ",
-    description: "المبالغ النقدية المسجلة اليوم",
-    className: styles.cashPayment,
-  },
-  {
-    title: "كليك / تحويل",
-    value: "0.000 د.أ",
-    description: "الدفعات الإلكترونية المسجلة",
-    className: styles.clickPayment,
-  },
-  {
-    title: "كوبون",
-    value: "0.000 د.أ",
-    description: "القيمة المستخدمة من محفظة الكوبونات",
-    className: styles.couponPayment,
-  },
-];
+export const dynamic =
+  "force-dynamic";
 
-const topProducts = [
-  {
-    name: "لا توجد مبيعات بعد",
-    quantity: 0,
-    percentage: 0,
-  },
-];
+function formatMoney(
+  fils: number,
+) {
+  return `${(
+    fils / 1000
+  ).toFixed(3)} د.أ`;
+}
 
-const chartBars = [
-  28,
-  46,
-  34,
-  58,
-  44,
-  72,
-  52,
-  68,
-  40,
-  61,
-  49,
-  76,
-];
+function formatTime(
+  date: Date,
+) {
+  return new Intl.DateTimeFormat(
+    "ar-JO",
+    {
+      timeZone:
+        "Asia/Amman",
 
-export default function AdminPage() {
+      hour: "numeric",
+
+      minute: "2-digit",
+    },
+  ).format(date);
+}
+
+function formatSaleTime(
+  date: Date,
+) {
+  return new Intl.DateTimeFormat(
+    "ar-JO",
+    {
+      timeZone:
+        "Asia/Amman",
+
+      hour: "numeric",
+
+      minute: "2-digit",
+    },
+  ).format(date);
+}
+
+function getPaymentLabel(
+  paymentMethod:
+    | "CASH"
+    | "CLICK",
+) {
+  return paymentMethod ===
+    "CASH"
+    ? "كاش"
+    : "كليك / تحويل";
+}
+
+export default async function AdminPage() {
+  const data =
+    await getAdminDashboardData();
+
+  const currentShift =
+    data.currentShift;
+
+  const paymentMethods = [
+    {
+      title: "كاش",
+
+      value:
+        formatMoney(
+          data.todayCashFils,
+        ),
+
+      description:
+        "المبالغ النقدية المسجلة اليوم",
+
+      className:
+        styles.cashPayment,
+    },
+
+    {
+      title:
+        "كليك / تحويل",
+
+      value:
+        formatMoney(
+          data.todayClickFils,
+        ),
+
+      description:
+        "الدفعات الإلكترونية المسجلة اليوم",
+
+      className:
+        styles.clickPayment,
+    },
+
+    {
+      title: "كوبون",
+
+      value:
+        formatMoney(
+          data.todayCouponFils,
+        ),
+
+      description:
+        "سيتم احتساب استخدام الكوبونات مع نظام الطلبات",
+
+      className:
+        styles.couponPayment,
+    },
+  ];
+
+  const topProducts =
+    data.topProducts.length >
+    0
+      ? data.topProducts
+      : [
+          {
+            name:
+              "لا توجد مبيعات بعد",
+
+            quantity: 0,
+
+            percentage: 0,
+          },
+        ];
+
   return (
     <div
-      className={styles.dashboard}
+      className={
+        styles.dashboard
+      }
       dir="rtl"
     >
-      <section className={styles.hero}>
+      <DashboardAutoRefresh />
+
+      <section
+        className={
+          styles.hero
+        }
+      >
         <div>
-          <p className={styles.eyebrow}>
+          <p
+            className={
+              styles.eyebrow
+            }
+          >
             لوحة التحكم
           </p>
 
           <h1>
-            أهلاً بك في نظام محطة الفنار
+            أهلاً بك في نظام
+            محطة الفنار
           </h1>
 
-          <p className={styles.heroText}>
-            ملخص سريع للمبيعات والطلبات
-            والشفتات والمخزون وحالة التشغيل.
+          <p
+            className={
+              styles.heroText
+            }
+          >
+            ملخص مباشر للمبيعات
+            والشفت الحالي وطرق
+            الدفع وحالة التشغيل.
           </p>
         </div>
 
-        <div className={styles.systemStatus}>
+        <div
+          className={
+            styles.systemStatus
+          }
+        >
           <span
-            className={styles.statusDot}
+            className={
+              styles.statusDot
+            }
           />
 
           النظام يعمل
@@ -76,17 +186,23 @@ export default function AdminPage() {
       </section>
 
       <section
-        className={styles.summaryGrid}
+        className={
+          styles.summaryGrid
+        }
       >
         <article
-          className={styles.summaryCard}
+          className={
+            styles.summaryCard
+          }
         >
           <div
             className={
               styles.summaryCardTop
             }
           >
-            <span>إجمالي مبيعات اليوم</span>
+            <span>
+              إجمالي مبيعات اليوم
+            </span>
 
             <span
               className={
@@ -98,51 +214,67 @@ export default function AdminPage() {
           </div>
 
           <strong>
-            0.000 د.أ
+            {formatMoney(
+              data.todaySalesFils,
+            )}
           </strong>
 
           <small>
-            إجمالي جميع طرق الدفع
+            مجموع عمليات البيع
+            المباشر المسجلة اليوم
           </small>
         </article>
 
         <article
-          className={styles.summaryCard}
+          className={
+            styles.summaryCard
+          }
         >
           <div
             className={
               styles.summaryCardTop
             }
           >
-            <span>طلبات اليوم</span>
+            <span>
+              عمليات البيع اليوم
+            </span>
 
             <span
               className={
                 styles.cardIndicator
               }
             >
-              0
+              {
+                data.todaySaleCount
+              }
             </span>
           </div>
 
           <strong>
-            0
+            {
+              data.todaySaleCount
+            }
           </strong>
 
           <small>
-            الطلبات الجديدة والمكتملة
+            عدد عمليات البيع
+            المباشر المكتملة
           </small>
         </article>
 
         <article
-          className={styles.summaryCard}
+          className={
+            styles.summaryCard
+          }
         >
           <div
             className={
               styles.summaryCardTop
             }
           >
-            <span>الكاش المتوقع</span>
+            <span>
+              الكاش المتوقع
+            </span>
 
             <span
               className={
@@ -154,30 +286,43 @@ export default function AdminPage() {
           </div>
 
           <strong>
-            0.000 د.أ
+            {formatMoney(
+              currentShift
+                ?.cashSalesFils ??
+                0,
+            )}
           </strong>
 
           <small>
-            النقد الفعلي المتوقع داخل الصندوق
+            الكاش المسجل في الشفت
+            المفتوح حاليًا
           </small>
         </article>
 
         <article
-          className={styles.summaryCard}
+          className={
+            styles.summaryCard
+          }
         >
           <div
             className={
               styles.summaryCardTop
             }
           >
-            <span>الشفت الحالي</span>
+            <span>
+              الشفت الحالي
+            </span>
 
             <span
               className={
-                styles.neutralIndicator
+                currentShift
+                  ? styles.cardIndicator
+                  : styles.neutralIndicator
               }
             >
-              غير مفتوح
+              {currentShift
+                ? "مفتوح"
+                : "غير مفتوح"}
             </span>
           </div>
 
@@ -186,18 +331,30 @@ export default function AdminPage() {
               styles.shiftValue
             }
           >
-            —
+            {currentShift
+              ? currentShift.employeeName
+              : "—"}
           </strong>
 
           <small>
-            لا يوجد موظف على شفت حاليًا
+            {currentShift
+              ? `بدأ الساعة ${formatTime(
+                  currentShift.openedAt,
+                )}`
+              : "لا يوجد موظف على شفت حاليًا"}
           </small>
         </article>
       </section>
 
-      <section className={styles.section}>
+      <section
+        className={
+          styles.section
+        }
+      >
         <div
-          className={styles.sectionTitle}
+          className={
+            styles.sectionTitle
+          }
         >
           <div>
             <h2>
@@ -205,8 +362,9 @@ export default function AdminPage() {
             </h2>
 
             <p>
-              توزيع المبيعات حسب طريقة الدفع
-              التي يسجلها الموظف.
+              توزيع المبيعات حسب
+              طريقة الدفع المسجلة
+              في عمليات البيع.
             </p>
           </div>
 
@@ -215,17 +373,24 @@ export default function AdminPage() {
               styles.sectionHint
             }
           >
-            إجمالي: 0.000 د.أ
+            إجمالي:{" "}
+            {formatMoney(
+              data.todaySalesFils,
+            )}
           </span>
         </div>
 
         <div
-          className={styles.paymentGrid}
+          className={
+            styles.paymentGrid
+          }
         >
           {paymentMethods.map(
             (method) => (
               <article
-                key={method.title}
+                key={
+                  method.title
+                }
                 className={`${styles.paymentCard} ${method.className}`}
               >
                 <div
@@ -240,16 +405,22 @@ export default function AdminPage() {
                   />
 
                   <span>
-                    {method.title}
+                    {
+                      method.title
+                    }
                   </span>
                 </div>
 
                 <strong>
-                  {method.value}
+                  {
+                    method.value
+                  }
                 </strong>
 
                 <p>
-                  {method.description}
+                  {
+                    method.description
+                  }
                 </p>
               </article>
             ),
@@ -258,13 +429,19 @@ export default function AdminPage() {
       </section>
 
       <section
-        className={styles.mainGrid}
+        className={
+          styles.mainGrid
+        }
       >
         <article
-          className={styles.largeCard}
+          className={
+            styles.largeCard
+          }
         >
           <div
-            className={styles.cardHeader}
+            className={
+              styles.cardHeader
+            }
           >
             <div>
               <h2>
@@ -272,8 +449,8 @@ export default function AdminPage() {
               </h2>
 
               <p>
-                نظرة سريعة على نشاط المبيعات
-                خلال اليوم.
+                المبيعات الفعلية
+                المسجلة خلال اليوم.
               </p>
             </div>
 
@@ -303,12 +480,19 @@ export default function AdminPage() {
                 styles.chartBars
               }
             >
-              {chartBars.map(
-                (height, index) => (
+              {data.chartBars.map(
+                (
+                  height,
+                  index,
+                ) => (
                   <span
-                    key={`${height}-${index}`}
+                    key={
+                      index
+                    }
                     style={{
-                      height: `${height}%`,
+                      height:
+                        `${height}%`,
+
                       animationDelay:
                         `${index * 55}ms`,
                     }}
@@ -323,21 +507,30 @@ export default function AdminPage() {
               styles.chartFooter
             }
           >
-            <span>بداية اليوم</span>
-
             <span>
-              سيتم ربط الرسم بالمبيعات الفعلية
+              12 ص
             </span>
 
-            <span>الآن</span>
+            <span>
+              كل عمود يمثل ساعتين
+              من مبيعات اليوم
+            </span>
+
+            <span>
+              الآن
+            </span>
           </div>
         </article>
 
         <article
-          className={styles.sideCard}
+          className={
+            styles.sideCard
+          }
         >
           <div
-            className={styles.cardHeader}
+            className={
+              styles.cardHeader
+            }
           >
             <div>
               <h2>
@@ -345,7 +538,8 @@ export default function AdminPage() {
               </h2>
 
               <p>
-                ترتيب المنتجات حسب الكمية.
+                ترتيب المنتجات حسب
+                الكمية المباعة اليوم.
               </p>
             </div>
           </div>
@@ -358,7 +552,9 @@ export default function AdminPage() {
             {topProducts.map(
               (product) => (
                 <div
-                  key={product.name}
+                  key={
+                    product.name
+                  }
                   className={
                     styles.productItem
                   }
@@ -369,12 +565,15 @@ export default function AdminPage() {
                     }
                   >
                     <strong>
-                      {product.name}
+                      {
+                        product.name
+                      }
                     </strong>
 
                     <span>
-                      {product.quantity}
-                      {" "}
+                      {
+                        product.quantity
+                      }{" "}
                       وحدة
                     </span>
                   </div>
@@ -393,7 +592,10 @@ export default function AdminPage() {
                   </div>
 
                   <small>
-                    {product.percentage}%
+                    {
+                      product.percentage
+                    }
+                    %
                   </small>
                 </div>
               ),
@@ -430,7 +632,9 @@ export default function AdminPage() {
             </strong>
 
             <small>
-              ستظهر تنبيهات انخفاض المخزون هنا.
+              سيتم ربط المخزون بعد
+              إنهاء دورة البيع
+              والتوصيل.
             </small>
           </div>
         </article>
@@ -458,7 +662,8 @@ export default function AdminPage() {
             </strong>
 
             <small>
-              طلبات إعادة تعبئة الثلاجة ستظهر هنا.
+              نظام الثلاجة سيتم
+              ربطه لاحقًا.
             </small>
           </div>
         </article>
@@ -486,7 +691,9 @@ export default function AdminPage() {
             </strong>
 
             <small>
-              العمليات التي تحتاج تدخل الإدارة.
+              العمليات التي تحتاج
+              تدخل الإدارة ستظهر
+              هنا.
             </small>
           </div>
         </article>
@@ -498,50 +705,113 @@ export default function AdminPage() {
         }
       >
         <article
-          className={styles.tableCard}
+          className={
+            styles.tableCard
+          }
         >
           <div
-            className={styles.cardHeader}
+            className={
+              styles.cardHeader
+            }
           >
             <div>
               <h2>
-                آخر الطلبات
+                آخر عمليات البيع
               </h2>
 
               <p>
-                أحدث العمليات المسجلة في النظام.
+                أحدث عمليات البيع
+                المباشر المسجلة
+                اليوم.
               </p>
             </div>
           </div>
 
-          <div
-            className={
-              styles.emptyOrders
-            }
-          >
+          {data.recentSales.length ===
+          0 ? (
             <div
               className={
-                styles.emptyIcon
+                styles.emptyOrders
               }
             >
-              0
+              <div
+                className={
+                  styles.emptyIcon
+                }
+              >
+                0
+              </div>
+
+              <strong>
+                لا توجد عمليات بيع
+                بعد
+              </strong>
+
+              <span>
+                ستظهر عمليات البيع
+                هنا فور تسجيلها من
+                شاشة المحل.
+              </span>
             </div>
+          ) : (
+            <div
+              className={
+                styles.productsList
+              }
+            >
+              {data.recentSales.map(
+                (sale) => (
+                  <div
+                    key={
+                      sale.id
+                    }
+                    className={
+                      styles.productItem
+                    }
+                  >
+                    <div
+                      className={
+                        styles.productInfo
+                      }
+                    >
+                      <strong>
+                        {formatMoney(
+                          sale.totalFils,
+                        )}
+                      </strong>
 
-            <strong>
-              لا توجد طلبات بعد
-            </strong>
+                      <span>
+                        {
+                          sale.employeeName
+                        }{" "}
+                        •{" "}
+                        {getPaymentLabel(
+                          sale.paymentMethod,
+                        )}
+                      </span>
+                    </div>
 
-            <span>
-              ستظهر آخر الطلبات هنا عند بدء التشغيل.
-            </span>
-          </div>
+                    <small>
+                      {formatSaleTime(
+                        sale.createdAt,
+                      )}
+                    </small>
+                  </div>
+                ),
+              )}
+            </div>
+          )}
         </article>
 
         <article
-          className={styles.shiftCard}
+          className={
+            styles.shiftCard
+          }
         >
           <div
-            className={styles.cardHeader}
+            className={
+              styles.cardHeader
+            }
           >
             <div>
               <h2>
@@ -549,7 +819,8 @@ export default function AdminPage() {
               </h2>
 
               <p>
-                حالة التشغيل والموظف المسؤول.
+                حالة التشغيل
+                والموظف المسؤول.
               </p>
             </div>
           </div>
@@ -569,7 +840,9 @@ export default function AdminPage() {
               </span>
 
               <strong>
-                غير مفتوح
+                {currentShift
+                  ? "مفتوح"
+                  : "غير مفتوح"}
               </strong>
             </div>
 
@@ -583,7 +856,9 @@ export default function AdminPage() {
               </span>
 
               <strong>
-                —
+                {currentShift
+                  ? currentShift.employeeName
+                  : "—"}
               </strong>
             </div>
 
@@ -597,7 +872,11 @@ export default function AdminPage() {
               </span>
 
               <strong>
-                —
+                {currentShift
+                  ? formatTime(
+                      currentShift.openedAt,
+                    )
+                  : "—"}
               </strong>
             </div>
 
@@ -607,11 +886,51 @@ export default function AdminPage() {
               }
             >
               <span>
-                نوع الشفت
+                مبيعات الشفت
               </span>
 
               <strong>
-                —
+                {currentShift
+                  ? formatMoney(
+                      currentShift.totalSalesFils,
+                    )
+                  : "—"}
+              </strong>
+            </div>
+
+            <div
+              className={
+                styles.shiftRow
+              }
+            >
+              <span>
+                كاش الشفت
+              </span>
+
+              <strong>
+                {currentShift
+                  ? formatMoney(
+                      currentShift.cashSalesFils,
+                    )
+                  : "—"}
+              </strong>
+            </div>
+
+            <div
+              className={
+                styles.shiftRow
+              }
+            >
+              <span>
+                كليك / تحويل
+              </span>
+
+              <strong>
+                {currentShift
+                  ? formatMoney(
+                      currentShift.clickSalesFils,
+                    )
+                  : "—"}
               </strong>
             </div>
           </div>

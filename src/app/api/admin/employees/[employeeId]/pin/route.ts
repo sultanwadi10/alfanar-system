@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { updateEmployeePinHash } from "@/lib/employees/employee-repository";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
+import { hasValidOrigin } from "@/lib/security/has-valid-origin";
 import { hashEmployeePin } from "@/lib/security/employee-pin";
 import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
@@ -20,15 +21,10 @@ export async function PATCH(
   try {
     await getAdminSecurityContext();
 
-    const origin =
-      request.headers.get("origin");
-
-    const requestOrigin =
-      new URL(request.url).origin;
-
     if (
-      !origin ||
-      origin !== requestOrigin
+      !hasValidOrigin(
+        request,
+      )
     ) {
       return NextResponse.json(
         {
