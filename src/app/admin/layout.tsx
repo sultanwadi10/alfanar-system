@@ -1,3 +1,4 @@
+
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
@@ -16,7 +17,7 @@ export default async function AdminLayout({
     await getAdminSecurityContext();
   } catch (error) {
     if (isSecurityError(error)) {
-      redirect("/login");
+      redirect("/login?target=admin");
     }
 
     throw error;

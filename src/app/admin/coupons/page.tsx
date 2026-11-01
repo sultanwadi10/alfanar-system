@@ -1,11 +1,3 @@
-export default function CouponsPage() {
-  return (
-    <section>
-      <h1>الكوبونات</h1>
-
-      <p>
-        سيتم بناء إدارة الكوبونات هنا.
-      </p>
-    </section>
-  );
-}
+import CouponBooklets from "./coupon-booklets";
+export const dynamic = "force-dynamic";
+export default function CouponsPage() { return <CouponBooklets />; }

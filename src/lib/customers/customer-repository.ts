@@ -725,7 +725,18 @@ export async function creditCustomerCoupons(
         balanceBefore +
         input.amount;
 
-      if (balanceAfter > 22) {
+      if ((customer as CustomerRecord & { pendingBookletSaleOrderId?: string }).pendingBookletSaleOrderId) {
+        throw new CustomerCouponLimitError();
+      }
+      const activeBookletDocs = await transaction.get(
+        firestore.collection("couponBooklets").where("customerId", "==", customerId),
+      );
+      const physicalRemainingForCouponCap = activeBookletDocs.docs.reduce((sum, document) => {
+        const record = document.data();
+        return record.status === "ACTIVE" && Number.isSafeInteger(record.remainingCoupons)
+          ? sum + record.remainingCoupons : sum;
+      }, 0);
+      if (balanceAfter + physicalRemainingForCouponCap > 22) {
         throw new CustomerCouponLimitError();
       }
 

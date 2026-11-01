@@ -816,3 +816,20 @@
     transition: none;
   }
 }
+/* Alfanar customer-profile redesign – keeps the original edit/archive flows. */
+.profileHeader {
+  background: linear-gradient(115deg,
+    color-mix(in srgb,var(--color-primary) 11%,var(--color-surface)),
+    var(--color-surface) 77%);
+  border-radius: 23px;
+  padding: clamp(18px,2.3vw,30px);
+  box-shadow: 0 8px 26px rgba(18,69,127,.045);
+}
+.identity h1 {font-size:clamp(24px,2.5vw,33px);letter-spacing:-.4px}
+.avatar {width:66px;height:66px;flex-basis:66px;border-radius:18px;font-size:26px}
+.contentGrid {grid-template-columns:minmax(0,1.5fr) minmax(260px,.65fr)}
+.detailsCard,.dangerCard {border-radius:19px}
+.cardHeader {background:var(--color-surface-secondary)}
+.page {gap:19px}
+@media(max-width:1050px){.contentGrid{grid-template-columns:1fr}}
+@media(max-width:600px){.profileHeader{padding:18px}.avatar{width:54px;height:54px;flex-basis:54px;font-size:21px}}

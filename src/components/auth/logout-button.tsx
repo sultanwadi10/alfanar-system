@@ -41,8 +41,13 @@ export function LogoutButton({
         return;
       }
 
-      router.replace("/login");
-      router.refresh();
+      if (target === "admin") {
+  window.location.replace("/");
+  return;
+}
+
+router.replace("/login");
+router.refresh();
     } catch (error) {
       setErrorMessage(
         error instanceof Error

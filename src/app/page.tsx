@@ -7,7 +7,7 @@ import {
 
 import styles from "./page.module.css";
 
-const STEALTH_CODE_DIGITS = 10;
+
 const PAIRING_VISIBILITY_CHECK_MS = 1500;
 const MAX_DISPLAY_LENGTH = 16;
 
@@ -88,9 +88,10 @@ function calculate(
 function isUnlockCandidate(
   value: string,
 ) {
-  return new RegExp(
-    `^\\d{${STEALTH_CODE_DIGITS}}$`,
-  ).test(value);
+  return (
+    /^\d{10}$/.test(value) ||
+    /^\d{12}$/.test(value)
+  );
 }
 
 export default function Home() {
@@ -188,59 +189,64 @@ export default function Home() {
     }
   }
 
-  async function attemptStealthUnlock(
-    code: string,
+  
+async function attemptStealthUnlock(
+  code: string,
+) {
+  if (
+    unlockLoading ||
+    !isUnlockCandidate(code)
   ) {
-    if (
-      unlockLoading ||
-      !isUnlockCandidate(
-        code,
-      )
-    ) {
+    return;
+  }
+
+  const isAdminCode =
+    code.length === 12;
+
+  setUnlockLoading(true);
+
+  try {
+    const response = await fetch(
+      isAdminCode
+        ? "/api/admin-stealth/unlock"
+        : "/api/store-device/unlock",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          code,
+        }),
+      },
+    );
+
+    if (response.status !== 200) {
       return;
     }
 
-    setUnlockLoading(true);
+    const data =
+      await response.json();
 
-    try {
-      const response =
-        await fetch(
-          "/api/store-device/unlock",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                code,
-              }),
-          },
+    if (data.success === true) {
+      if (isAdminCode) {
+        window.location.replace(
+          "/login?target=admin",
         );
-
-      if (
-        response.status !== 200
-      ) {
-        return;
-      }
-
-      const data =
-        await response.json();
-
-      if (
-        data.success === true
-      ) {
+      } else {
         await requestEntry();
       }
-    } catch {
-      // Wrong/unavailable unlocks intentionally look like ordinary calculator use.
-    } finally {
-      setUnlockLoading(false);
     }
+  } catch {
+    // Failed unlocks appear as ordinary calculator use.
+  } finally {
+    setUnlockLoading(false);
   }
+}
+
 
   useEffect(() => {
     if (!pairingOpen) {

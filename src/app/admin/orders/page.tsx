@@ -1,11 +1,7 @@
-export default function OrdersPage() {
-  return (
-    <section>
-      <h1>الطلبات</h1>
+import AdminOrders from "./admin-orders";
 
-      <p>
-        سيتم بناء إدارة الطلبات هنا.
-      </p>
-    </section>
-  );
+export const dynamic = "force-dynamic";
+
+export default function OrdersPage() {
+  return <AdminOrders />;
 }

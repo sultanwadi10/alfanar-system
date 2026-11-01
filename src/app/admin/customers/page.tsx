@@ -1,126 +1,30 @@
-import {
-  listArchivedCustomers,
-  listCustomers,
-} from "@/lib/customers/customer-repository";
+import { listArchivedCustomers, listCustomers } from "@/lib/customers/customer-repository";
+import { getActiveBookletBalances } from "@/lib/coupons/booklet-service";
 import type { Customer } from "@/types/customer";
-
 import { CustomersManager } from "./customers-manager";
 
-function getCreatorLabel(
-  customer: Customer,
-) {
-  if (
-    customer.createdSource ===
-    "EMPLOYEE"
-  ) {
-    if (
-      customer.createdByEmployeeNameSnapshot
-    ) {
-      return `الموظف — ${customer.createdByEmployeeNameSnapshot}`;
-    }
-
-    return "موظف";
-  }
-
-  if (
-    customer.createdSource ===
-    "APP"
-  ) {
-    return "العميل من التطبيق";
-  }
-
+export const dynamic = "force-dynamic";
+function creator(customer: Customer) {
+  if (customer.createdSource === "EMPLOYEE") return customer.createdByEmployeeNameSnapshot
+    ? `الموظف — ${customer.createdByEmployeeNameSnapshot}` : "موظف";
+  if (customer.createdSource === "APP") return "العميل من التطبيق";
   return "الإدارة";
 }
-
-function getArchivedAtLabel(
-  customer: Customer,
-) {
-  if (!customer.archivedAt) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat(
-    "ar-JO",
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    },
-  ).format(
-    customer.archivedAt,
-  );
+function archiveDate(customer: Customer) {
+  return customer.archivedAt ? new Intl.DateTimeFormat("ar-JO", {
+    timeZone: "Asia/Amman", dateStyle: "medium",
+  }).format(customer.archivedAt) : null;
 }
-
 export default async function CustomersPage() {
-  const [
-    customers,
-    archivedCustomers,
-  ] = await Promise.all([
-    listCustomers(),
-    listArchivedCustomers(),
+  const [active, archived, balances] = await Promise.all([
+    listCustomers(), listArchivedCustomers(), getActiveBookletBalances(),
   ]);
-
-  const activeItems =
-    customers.map((customer) => ({
-      id: customer.id,
-
-      name: customer.name,
-
-      phone: customer.phone,
-
-      couponBalance:
-        customer.couponBalance,
-
-      lastOrderLabel: null,
-
-      appLinked:
-        customer.appLinked,
-
-      hasSpecialPrice: false,
-
-      creatorLabel:
-        getCreatorLabel(customer),
-
-      archivedAtLabel: null,
-    }));
-
-  const archivedItems =
-    archivedCustomers.map(
-      (customer) => ({
-        id: customer.id,
-
-        name: customer.name,
-
-        phone: customer.phone,
-
-        couponBalance:
-          customer.couponBalance,
-
-        lastOrderLabel: null,
-
-        appLinked:
-          customer.appLinked,
-
-        hasSpecialPrice: false,
-
-        creatorLabel:
-          getCreatorLabel(customer),
-
-        archivedAtLabel:
-          getArchivedAtLabel(
-            customer,
-          ),
-      }),
-    );
-
-  return (
-    <CustomersManager
-      activeCustomers={
-        activeItems
-      }
-      archivedCustomers={
-        archivedItems
-      }
-    />
-  );
+  const serialize = (customer: Customer) => ({
+    id: customer.id, name: customer.name, phone: customer.phone,
+    couponBalance: balances.get(customer.id) ?? 0,
+    lastOrderLabel: null, appLinked: customer.appLinked,
+    hasSpecialPrice: false, creatorLabel: creator(customer),
+    archivedAtLabel: archiveDate(customer),
+  });
+  return <CustomersManager activeCustomers={active.map(serialize)} archivedCustomers={archived.map(serialize)} />;
 }

@@ -1,0 +1,30 @@
+.page { --bg:#eef4f9; --card:#fff; --text:#152a40; --muted:#708398; --border:#d9e5ef; --accent:#245fdb; min-height:100vh; box-sizing:border-box; padding:26px 24px 60px; background:var(--bg); color:var(--text); }
+:global(html[data-theme="dark"]) .page { --bg:#0d1925; --card:#172838; --text:#edf4fb; --muted:#9db1c4; --border:#2e465b; --accent:#77a4ff; }
+.page * { box-sizing:border-box; } .page button,.page input { font:inherit; } .page button { cursor:pointer; } .page button:disabled { opacity:.6; cursor:wait; }
+.container { width:min(1250px,100%); margin-inline:auto; }
+.header { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:23px; }
+.eyebrow { color:var(--accent); font-size:.77rem; font-weight:850; }
+.header h1 { font-size:clamp(1.6rem,3vw,2.15rem); margin:4px 0; }
+.header p { margin:0; font-size:.83rem; color:var(--muted); }
+.headerButtons { display:flex; gap:9px; }
+.headerButtons button,.formHeading button { min-height:41px; padding:0 15px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:var(--text); font-weight:850; }
+.headerButtons .primary,.formPanel > .primary { background:#245fdb; border-color:#245fdb; color:#fff; }
+.error { padding:13px 16px; margin-bottom:15px; border:1px solid #f0abab; border-radius:11px; background:#fff1f1; color:#a42d2d; }
+.created { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:15px; margin-bottom:17px; border:1px solid #9ad5b5; background:#e8f8ef; color:#166743; border-radius:12px; }
+.created div { flex:1; } .created p { margin:3px 0; font-size:.77rem; } .created button { padding:9px 13px; border-radius:9px; border:1px solid #9ad5b5; background:#fff; color:#166743; font-weight:800; }
+.formPanel,.searchPanel { padding:23px; border:1px solid var(--border); border-radius:20px; background:var(--card); margin-bottom:18px; box-shadow:0 8px 28px rgba(20,52,90,.035); }
+.formHeading { display:flex; align-items:center; justify-content:space-between; } .formHeading h2 { margin:0 0 16px; }
+.formFields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; margin-bottom:16px; }
+.formFields label { display:grid; gap:8px; font-size:.8rem; font-weight:850; } .formFields .wide { grid-column:1/-1; }
+.formFields input,.searchPanel input { width:100%; min-height:48px; border:1px solid var(--border); border-radius:11px; padding:0 14px; background:var(--bg); color:var(--text); outline-offset:3px; }
+.formPanel > .primary { min-height:43px; padding:0 19px; border-radius:10px; border:0; font-weight:900; }
+.searchPanel > label { display:block; margin-bottom:10px; font-weight:900; } .searchPanel input { font-size:.91rem; }
+.searchPanel > small { display:block; margin-top:11px; color:var(--muted); font-size:.73rem; line-height:1.8; }
+.hint,.empty { color:var(--muted); padding:20px 0; text-align:center; font-size:.83rem; }
+.results { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:17px; }
+.card { display:flex; align-items:center; gap:13px; padding:15px; min-width:0; border:1px solid var(--border); border-radius:13px; background:var(--card); }
+.avatar { display:grid; flex-shrink:0; place-items:center; width:43px; height:43px; border-radius:12px; background:#e7f0ff; color:#245fdb; font-weight:900; font-size:1.2rem; }
+.details { flex:1; min-width:0; display:grid; gap:3px; } .details strong { font-size:.82rem; } .details span { font-size:.76rem; color:var(--accent); } .details p { font-size:.74rem; color:var(--muted); margin:0; line-height:1.65; overflow-wrap:anywhere; }
+.card > button { padding:9px 12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--accent); font-weight:850; font-size:.76rem; white-space:nowrap; }
+@media(max-width:900px) { .results { grid-template-columns:1fr; } }
+@media(max-width:600px) { .page { padding:13px 12px 40px; } .header { align-items:stretch; flex-direction:column; } .formPanel,.searchPanel { padding:17px; } .formFields { grid-template-columns:1fr; } .card { flex-wrap:wrap; } .card > button { margin-inline-start:auto; } }

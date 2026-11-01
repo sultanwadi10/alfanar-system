@@ -9,10 +9,7 @@ import { useRouter } from "next/navigation";
 
 import styles from "./customer-details.module.css";
 
-import {
-  CustomerCouponWallet,
-  type CouponTransactionItem,
-} from "./customer-coupon-wallet";
+import { CustomerBookletWallet, type CustomerWalletData } from "./customer-booklet-wallet";
 
 type CustomerDetailsData = {
   id: string;
@@ -26,6 +23,7 @@ type CustomerDetailsData = {
   adminNotes: string;
 
   couponBalance: number;
+  deliveryOrdersCount: number;
 
   appLinked: boolean;
 
@@ -43,13 +41,12 @@ type CustomerDetailsData = {
 type CustomerDetailsManagerProps = {
   customer: CustomerDetailsData;
 
-  couponTransactions:
-    CouponTransactionItem[];
+  walletData: CustomerWalletData;
 };
 
 export function CustomerDetailsManager({
   customer,
-  couponTransactions,
+  walletData,
 }: CustomerDetailsManagerProps) {
   const router = useRouter();
 
@@ -372,65 +369,13 @@ export function CustomerDetailsManager({
           {errorMessage}
         </div>
       )}
-
-      <section
-        className={styles.statsGrid}
-      >
-        <article
-          className={styles.statCard}
-        >
-          <span>
-            رصيد الكوبونات
-          </span>
-
-          <strong>
-            {customer.couponBalance}
-            {" "}
-            / 22
-          </strong>
-
-          <small>
-            الرصيد الحالي داخل
-            محفظة العميل.
-          </small>
-        </article>
-
-        <article
-          className={styles.statCard}
-        >
-          <span>
-            إجمالي الطلبات
-          </span>
-
-          <strong>
-            0
-          </strong>
-
-          <small>
-            سيتم ربطه بنظام الطلبات.
-          </small>
-        </article>
-
-        <article
-          className={styles.statCard}
-        >
-          <span>
-            السعر الخاص
-          </span>
-
-          <strong>
-            لا يوجد
-          </strong>
-
-          <small>
-            سيتم ربطه بنظام الأسعار.
-          </small>
-        </article>
-      </section>
-
-      <div
-        className={styles.contentGrid}
-      >
+      <CustomerBookletWallet
+        customerId={customer.id}
+        customerName={customer.name}
+        isArchived={customer.isArchived}
+        data={walletData}
+      />
+      <div className={styles.contentGrid}>
         <section
           className={
             styles.detailsCard
@@ -684,20 +629,6 @@ export function CustomerDetailsManager({
             styles.sideColumn
           }
         >
-          <CustomerCouponWallet
-            customerId={
-              customer.id
-            }
-            couponBalance={
-              customer.couponBalance
-            }
-            isArchived={
-              customer.isArchived
-            }
-            transactions={
-              couponTransactions
-            }
-          />
 
           {!customer.isArchived ? (
             <section

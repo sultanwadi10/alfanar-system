@@ -1651,221 +1651,51 @@ export default function EmployeePortal() {
             </div>
           )}
 
-          <section
-            className={
-              styles.operationGrid
-            }
-          >
-            <button
-              type="button"
-              className={
-                styles.saleAction
-              }
-              onClick={() =>
-                router.push(
-                  "/employee/sale",
-                )
-              }
-            >
-              <span
-                className={
-                  styles.actionIconPrimary
-                }
-              >
-                +
-              </span>
+          <section className={styles.operationGrid}>
+  <button type="button" className={styles.saleAction}
+    onClick={() => router.push("/employee/sale")}>
+    <span className={styles.actionIconPrimary}>+</span>
+    <div className={styles.actionContent}>
+      <span>عملية سريعة</span>
+      <strong>بيع مباشر</strong>
+      <small>البيع داخل المحل</small>
+    </div>
+    <span className={styles.actionArrow}>←</span>
+  </button>
 
-              <div
-                className={
-                  styles.actionContent
-                }
-              >
-                <span>
-                  عملية سريعة
-                </span>
+  <button type="button" className={styles.deliveryAction}
+    onClick={() => router.push("/employee/orders/new")}>
+    <span className={styles.actionIcon}>ت</span>
+    <div className={styles.actionContent}>
+      <span>تسجيل طلب</span>
+      <strong>طلب توصيل جديد</strong>
+      <small>اختر العميل والأصناف</small>
+    </div>
+    <span className={styles.actionArrow}>←</span>
+  </button>
 
-                <strong>
-                  بيع مباشر
-                </strong>
+  <button type="button" className={styles.smallAction}
+    onClick={() => router.push("/employee/orders")}>
+    <span className={styles.smallActionIcon}>ط</span>
+    <div>
+      <span>التوصيل اليومي</span>
+      <strong>طلبات اليوم</strong>
+      <small>جديد، جاهز، تم التسليم</small>
+    </div>
+  </button>
 
-                <small>
-                  زبون موجود داخل
-                  المحل
-                </small>
-              </div>
+  <button type="button" className={styles.smallAction}
+    onClick={() => router.push("/employee/customers")}>
+    <span className={styles.smallActionIcon}>ع</span>
+    <div>
+      <span>قاعدة العملاء</span>
+      <strong>العملاء</strong>
+      <small>بحث وإضافة عميل</small>
+    </div>
+  </button>
+</section>
 
-              <span
-                className={
-                  styles.actionArrow
-                }
-              >
-                ←
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={
-                styles.deliveryAction
-              }
-              disabled
-            >
-              <span
-                className={
-                  styles.actionIcon
-                }
-              >
-                ت
-              </span>
-
-              <div
-                className={
-                  styles.actionContent
-                }
-              >
-                <span>
-                  المرحلة التالية
-                </span>
-
-                <strong>
-                  طلب توصيل
-                </strong>
-
-                <small>
-                  تسجيل طلب زبون
-                  للتوصيل
-                </small>
-              </div>
-
-              <span
-                className={
-                  styles.nextBadge
-                }
-              >
-                قريبًا
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={
-                styles.smallAction
-              }
-              disabled
-            >
-              <span
-                className={
-                  styles.smallActionIcon
-                }
-              >
-                ط
-              </span>
-
-              <div>
-                <span>
-                  المتابعة
-                </span>
-
-                <strong>
-                  طلبات التوصيل
-                </strong>
-
-                <small>
-                  متابعة الطلبات
-                  النشطة
-                </small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={
-                styles.smallAction
-              }
-              disabled
-            >
-              <span
-                className={
-                  styles.smallActionIcon
-                }
-              >
-                ع
-              </span>
-
-              <div>
-                <span>
-                  قاعدة العملاء
-                </span>
-
-                <strong>
-                  العملاء
-                </strong>
-
-                <small>
-                  بحث وإضافة عميل
-                </small>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={
-                styles.smallAction
-              }
-              disabled
-            >
-              <span
-                className={
-                  styles.smallActionIcon
-                }
-              >
-                س
-              </span>
-
-              <div>
-                <span>
-                  مرجع سريع
-                </span>
-
-                <strong>
-                  الأسعار
-                </strong>
-
-                <small>
-                  عرض أسعار المنتجات
-                </small>
-              </div>
-            </button>
           </section>
-
-          <div
-            className={
-              styles.privacyNote
-            }
-          >
-            <div
-              className={
-                styles.privacyIcon
-              }
-            >
-              ✓
-            </div>
-
-            <div>
-              <strong>
-                الجرد المالي محمي
-              </strong>
-
-              <p>
-                الموظف يسجل الكاش
-                الموجود فعليًا فقط
-                عند نهاية الشفت.
-                المطابقة والفرق
-                يظهران للإدارة فقط.
-              </p>
-            </div>
-          </div>
-        </section>
 
         {closeModalOpen && (
           <div

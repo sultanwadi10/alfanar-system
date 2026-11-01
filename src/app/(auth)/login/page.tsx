@@ -1,7 +1,11 @@
+
 import {
   redirect,
 } from "next/navigation";
 
+import {
+  hasCurrentAdminStealthAccess,
+} from "@/lib/admin/admin-stealth-access";
 import {
   resolvePairedStoreDevice,
 } from "@/lib/store/store-device-repository";
@@ -53,10 +57,12 @@ export default async function LoginPage({
   let target:
     LoginTarget;
 
+  // Determine the requested login type.
   if (
     requestedTarget ===
     "store"
   ) {
+    // Store access requires a paired device.
     if (!pairedDevice) {
       redirect("/");
     }
@@ -66,17 +72,18 @@ export default async function LoginPage({
     requestedTarget ===
     "admin"
   ) {
-    if (pairedDevice) {
-      redirect("/");
-    }
-
+    // Admin access is allowed from any device,
+    // including a paired store device.
+    // The secret grant is checked below.
     target = "admin";
   } else {
+    // Preserve the existing default behavior.
     target = pairedDevice
       ? "store"
       : "admin";
   }
 
+  // Store login security checks.
   if (
     target === "store"
   ) {
@@ -107,6 +114,21 @@ export default async function LoginPage({
         runtime,
       )
     ) {
+      redirect("/");
+    }
+  }
+
+  // Admin login security checks.
+  if (
+    target === "admin"
+  ) {
+    const hasAccess =
+      await hasCurrentAdminStealthAccess()
+        .catch(
+          () => false,
+        );
+
+    if (!hasAccess) {
       redirect("/");
     }
   }

@@ -43,11 +43,7 @@ const navigationGroups: NavigationGroup[] = [
         href: "/admin/coupons",
         label: "الكوبونات",
       },
-      {
-        href: "/admin/maps",
-        label: "الخرائط",
-      },
-    ],
+      ],
   },
   {
     title: "المخزون والأسعار",

@@ -446,7 +446,7 @@ export function CustomersManager({
             }
           >
             <span>
-              إجمالي رصيد الكوبونات
+              إجمالي الكوبونات الفعلية
             </span>
 
             <span
@@ -465,7 +465,7 @@ export function CustomersManager({
           </strong>
 
           <small>
-            مجموع أرصدة ملفات
+            الكوبونات المتبقية في دفاتر
             العملاء.
           </small>
         </article>

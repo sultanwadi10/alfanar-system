@@ -1,0 +1,76 @@
+.overlay {
+  --dialog-panel: #ffffff;
+  --dialog-text: #172b47;
+  --dialog-muted: #60748c;
+  --dialog-line: #d8e5f3;
+  --dialog-soft: #f3f7fc;
+  --dialog-primary: #185cbe;
+  --dialog-primary-text: #fff;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 17, 35, .72);
+  backdrop-filter: blur(5px);
+}
+:global(html[data-theme="dark"]) .overlay {
+  --dialog-panel: #15283e;
+  --dialog-text: #edf5ff;
+  --dialog-muted: #b1c7dd;
+  --dialog-line: #34516c;
+  --dialog-soft: #1e3853;
+  --dialog-primary: #2775e1;
+  --dialog-primary-text: #fff;
+}
+.panel {
+  box-sizing: border-box;
+  width: min(520px, 100%);
+  max-height: min(90dvh, 720px);
+  overflow-y: auto;
+  background: var(--dialog-panel);
+  color: var(--dialog-text);
+  border: 1px solid var(--dialog-line);
+  border-radius: 23px;
+  box-shadow: 0 30px 90px rgba(0, 12, 31, .4);
+  padding: clamp(19px, 3.5vw, 29px);
+  font-family: inherit;
+  text-align: right;
+}
+.panel * { box-sizing: border-box; }
+.heading { display: flex; gap: 12px; align-items: center; margin-bottom: 15px; }
+.heading h2 { margin: 0; flex: 1; font-size: clamp(19px, 2.2vw, 23px); line-height: 1.35; font-weight: 900; color: var(--dialog-text); }
+.marker { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 14px; display: grid; place-items: center; background: rgba(35,110,216,.11); color: #3188ef; font-size: 23px; font-weight: 900; }
+.success .marker { color: #0ea47b; background: rgba(21,185,136,.13); }
+.warning .marker { color: #ae720c; background: rgba(225,155,25,.14); }
+.danger .marker { color: #df545b; background: rgba(235,77,87,.12); }
+.close { border: 0; color: var(--dialog-muted); background: transparent; padding: 0; width: 32px; height: 32px; border-radius: 9px; font: inherit; font-size: 26px; cursor: pointer; }
+.close:hover { background: var(--dialog-soft); }
+.description { color: var(--dialog-muted); white-space: pre-line; line-height: 1.95; font-size: 14px; margin: 0 0 17px; overflow-wrap: anywhere; }
+.options { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
+.options legend { margin-bottom: 10px; font-size: 13px; color: var(--dialog-text); font-weight: 800; }
+.choiceGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.choice { min-height: 86px; text-align: center; border: 1px solid var(--dialog-line); border-radius: 14px; background: var(--dialog-soft); color: var(--dialog-text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font: inherit; font-weight: 800; cursor: pointer; padding: 12px; }
+.choice strong { font-size: 16px; }
+.choice small { font-size: 11px; font-weight: 500; color: var(--dialog-muted); }
+.choice.selected { border: 2px solid var(--dialog-primary); background: color-mix(in srgb, var(--dialog-primary) 11%, var(--dialog-panel)); }
+.radio { width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--dialog-muted); }
+.choice.selected .radio { border: 5px solid var(--dialog-primary); background: var(--dialog-panel); }
+.extra { margin-bottom: 18px; padding: 13px; border: 1px solid var(--dialog-line); border-radius: 12px; background: var(--dialog-soft); color: var(--dialog-text); font-size: 13px; line-height: 1.8; }
+.extra p { margin: 0 0 6px; }
+.extra p:last-child { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--dialog-line); padding-top: 17px; }
+.actions button { min-height: 46px; border-radius: 12px; padding: 0 19px; cursor: pointer; font: inherit; font-weight: 850; font-size: 13px; }
+.cancel { border: 1px solid var(--dialog-line); background: var(--dialog-soft); color: var(--dialog-text); }
+.confirm { border: 1px solid transparent; background: var(--dialog-primary); color: var(--dialog-primary-text); }
+.danger .confirm { background: #bc3a44; }
+.actions button:disabled, .close:disabled, .choice:disabled { opacity: .55; cursor: not-allowed; }
+.overlay :is(button, input, textarea, select):focus-visible { outline: 3px solid #5bb5fa; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .overlay { padding: 12px; align-items: end; }
+  .panel { border-radius: 18px; padding: 18px; width: 100%; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .actions button { padding: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .overlay { backdrop-filter: none; } }
