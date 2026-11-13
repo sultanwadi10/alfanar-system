@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import {
   NextResponse,
 } from "next/server";
@@ -102,7 +103,7 @@ export async function GET() {
   }
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
 ) {
   try {
@@ -229,3 +230,4 @@ export async function POST(
     );
   }
 }
+export const POST = withOperationChanges(handlePOST, ["access","home"]);

@@ -1,8 +1,12 @@
+import { prepareDailyWage } from "./daily-wage-repository";
+import { OPERATOR_SESSION_CUTOFFS, operatorSessionCutoffId } from "@/lib/auth/operator-session-cutoff";
 import "server-only";
 
 import { createHash } from "node:crypto";
 
 import { Timestamp } from "firebase-admin/firestore";
+
+import { DEFAULT_SHIFT_TIMES, settleShiftCash, shiftTimeSnapshot, validWage } from "@/lib/shifts/shift-payroll";
 
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 
@@ -21,6 +25,14 @@ type ShiftStatus =
   (typeof SHIFT_STATUSES)[keyof typeof SHIFT_STATUSES];
 
 type ShiftRecord = {
+  wageFilsSnapshot?: number | null;
+  wageWorkDay?:string;
+  wageSettlement?:"PAID"|"ALREADY_PAID"|"UNCONFIGURED";
+  dailyWageReceiptId?:string|null;
+  wagePaidFils?: number;
+  expectedHandoverFils?: number;
+  payrollVersion?: number;
+  shiftTimeSnapshot?: ReturnType<typeof shiftTimeSnapshot>;
   storeAuthUid: string;
 
   status: ShiftStatus;
@@ -190,8 +202,8 @@ export async function getActiveShift(
     await shiftRef.get();
 
   if (!shiftSnapshot.exists) {
-    await indexRef.delete();
-
+    // A read must not delete an index that another request may have replaced.
+    // startShift transactionally replaces stale indices when opening a shift.
     return null;
   }
 
@@ -202,8 +214,6 @@ export async function getActiveShift(
     shift.status !==
     SHIFT_STATUSES.OPEN
   ) {
-    await indexRef.delete();
-
     return null;
   }
 
@@ -305,8 +315,20 @@ export async function startShift(input: {
       const now =
         Timestamp.now();
 
+      // Snapshot admin-only terms in the same transaction as opening the shift.
+      const wageDocument = await transaction.get(firestore.collection("systemSettings").doc("employeeWage"));
+      const timeDocument = await transaction.get(firestore.collection("systemSettings").doc("employeeShiftTimes"));
+      const wage = wageDocument.exists ? wageDocument.data()?.dailyWageFils : null;
+      if (wage !== null && !validWage(wage)) throw Error("Invalid wage configuration");
+      const timeRecord = timeDocument.data();
+      const times = timeRecord ? { morningStart: timeRecord.morningStart, morningEnd: timeRecord.morningEnd, eveningStart: timeRecord.eveningStart, eveningEnd: timeRecord.eveningEnd } : DEFAULT_SHIFT_TIMES;
+
       const record: ShiftRecord =
         {
+          wageFilsSnapshot: wage,
+          payrollVersion: 2,
+          shiftTimeSnapshot: shiftTimeSnapshot(now.toDate(), times),
+
           storeAuthUid:
             input.storeAuthUid,
 
@@ -447,130 +469,38 @@ export async function getShiftClosePreview(
 }
 
 export async function closeShift(input: {
-  storeAuthUid: string;
-
-  employeeId: string;
-
-  employeeName: string;
-
-  actualCashFils: number;
+  storeAuthUid: string; employeeId: string; employeeName: string; actualCashFils: number; shiftId: string;
 }): Promise<ClosedShiftSummary | null> {
-  const firestore =
-    getFirebaseAdminFirestore();
-
-  const indexRef =
-    firestore
-      .collection(
-        ACTIVE_STORE_SHIFTS_COLLECTION,
-      )
-      .doc(
-        getActiveStoreShiftDocumentId(
-          input.storeAuthUid,
-        ),
-      );
-
-  return firestore.runTransaction(
-    async (transaction) => {
-      const indexSnapshot =
-        await transaction.get(
-          indexRef,
-        );
-
-      if (!indexSnapshot.exists) {
-        return null;
-      }
-
-      const index =
-        indexSnapshot.data() as ActiveStoreShiftRecord;
-
-      const shiftRef =
-        firestore
-          .collection(
-            SHIFTS_COLLECTION,
-          )
-          .doc(
-            index.shiftId,
-          );
-
-      const shiftSnapshot =
-        await transaction.get(
-          shiftRef,
-        );
-
-      if (!shiftSnapshot.exists) {
-        return null;
-      }
-
-      const shift =
-        shiftSnapshot.data() as ShiftRecord;
-
-      if (
-        shift.status !==
-        SHIFT_STATUSES.OPEN
-      ) {
-        return null;
-      }
-
-      /*
-       * لا يستطيع موظف إنهاء شفت موظف آخر.
-       */
-      if (
-        shift.openedByEmployeeId !==
-        input.employeeId
-      ) {
-        return null;
-      }
-
-      const expectedCashFils =
-        shift.cashSalesFils;
-
-      const differenceFils =
-        input.actualCashFils -
-        expectedCashFils;
-
-      const now =
-        Timestamp.now();
-
-      transaction.update(
-        shiftRef,
-        {
-          status:
-            SHIFT_STATUSES.CLOSED,
-
-          closedByEmployeeId:
-            input.employeeId,
-
-          closedByEmployeeNameSnapshot:
-            input.employeeName,
-
-          closedAt:
-            now,
-
-          actualCashFils:
-            input.actualCashFils,
-
-          differenceFils,
-
-          updatedAt:
-            now,
-        },
-      );
-
-      transaction.delete(
-        indexRef,
-      );
-
-      return {
-        shiftId:
-          shiftRef.id,
-
-        expectedCashFils,
-
-        actualCashFils:
-          input.actualCashFils,
-
-        differenceFils,
-      };
-    },
-  );
+  const firestore = getFirebaseAdminFirestore();
+  const indexRef = firestore.collection(ACTIVE_STORE_SHIFTS_COLLECTION).doc(getActiveStoreShiftDocumentId(input.storeAuthUid));
+  const shiftRef = firestore.collection(SHIFTS_COLLECTION).doc(input.shiftId);
+  return firestore.runTransaction(async transaction => {
+    const shiftSnapshot = await transaction.get(shiftRef);
+    if (!shiftSnapshot.exists) return null;
+    const shift = shiftSnapshot.data() as ShiftRecord;
+    if (shift.storeAuthUid !== input.storeAuthUid || shift.openedByEmployeeId !== input.employeeId) return null;
+    // Retrying the original handover cannot close a later shift or charge its wage twice.
+    if (shift.status === SHIFT_STATUSES.CLOSED) {
+      if (shift.closedByEmployeeId !== input.employeeId || shift.actualCashFils === null || shift.differenceFils === null) return null;
+      return { shiftId: shiftRef.id, expectedCashFils: shift.expectedHandoverFils ?? shift.cashSalesFils, actualCashFils: shift.actualCashFils, differenceFils: shift.differenceFils };
+    }
+    if (shift.status !== SHIFT_STATUSES.OPEN) return null;
+    const indexSnapshot = await transaction.get(indexRef);
+    if (!indexSnapshot.exists || indexSnapshot.data()?.shiftId !== input.shiftId) return null;
+    const now = Timestamp.now();
+    const wage=await prepareDailyWage(transaction,firestore,shift,input,now);
+    const wagePaidFils=wage.paidFils;
+    const { expectedCashFils, differenceFils } = settleShiftCash(shift.cashSalesFils,wagePaidFils,input.actualCashFils);
+    wage.commit();
+    transaction.update(shiftRef, {
+      status: SHIFT_STATUSES.CLOSED, closedByEmployeeId: input.employeeId,
+      closedByEmployeeNameSnapshot: input.employeeName, closedAt: now,
+      actualCashFils: input.actualCashFils, differenceFils, wagePaidFils,
+      payrollVersion:2,wageWorkDay:wage.workDay,wageSettlement:wage.status,dailyWageReceiptId:wage.receiptId,
+      expectedHandoverFils: expectedCashFils, updatedAt: now,
+    });
+    transaction.set(firestore.collection(OPERATOR_SESSION_CUTOFFS).doc(operatorSessionCutoffId(input.storeAuthUid,input.employeeId)), { invalidBefore: now, shiftId:input.shiftId, storeAuthUid:input.storeAuthUid, employeeId:input.employeeId });
+    transaction.delete(indexRef);
+    return { shiftId: shiftRef.id, expectedCashFils, actualCashFils: input.actualCashFils, differenceFils };
+  });
 }

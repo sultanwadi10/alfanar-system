@@ -1,3 +1,6 @@
+import { openOrderReceivable } from "@/lib/receivables/records";
+import { prepareInventoryTransition, bottleRequirements } from "@/lib/inventory/stock-engine";
+import type { InventoryPlan, BottleReturn } from "@/types/inventory";
 import "server-only";
 
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -21,6 +24,9 @@ type Actor = {
 type CouponAllocation = { bookletId: string; quantity: number };
 
 type OrderRecord = {
+  inventoryPlan?: InventoryPlan | null;
+  bottleReturns?: BottleReturn[];
+  previousBottleReturns?: Array<BottleReturn & { label: string }>;
   storeAuthUid: string;
   orderDateKey: string;
   orderNumber: string;
@@ -43,6 +49,7 @@ type OrderRecord = {
   totalFils: number;
   paymentMethod: "CASH" | "CLICK" | "COUPON";
   paymentState: string;
+  collectedFils?: number;
   couponAllocations?: CouponAllocation[];
   pendingCouponQuantity?: number;
   bookletRequest?: { status: string } | null;
@@ -68,6 +75,11 @@ export function jordanDayKey(date = new Date()) {
 function toOperatorOrder(id: string, order: OrderRecord) {
   return {
     id,
+    inventoryTracked: !!order.inventoryPlan,
+    returnRequirements: bottleRequirements(order.inventoryPlan),
+    bottleReturns: order.bottleReturns ?? [],
+    previousBottleReturns: (order.previousBottleReturns ?? []).map(r => ({ itemId: r.itemId, label: r.label, quantity: r.quantity })),
+    source: (order as OrderRecord & {createdByType?:string}).createdByType === "ADMIN" ? "ADMIN" : "EMPLOYEE",
     number: order.orderNumber,
     status: order.status,
     customer: {
@@ -86,6 +98,7 @@ function toOperatorOrder(id: string, order: OrderRecord) {
     itemCount: order.itemCount ?? 0,
     totalFils: order.totalFils ?? 0,
     paymentMethod: order.paymentMethod,
+    paymentState: order.paymentState, collectedFils: order.collectedFils ?? 0, pendingCouponQuantity: order.pendingCouponQuantity ?? 0,
     // Status of the handover request, NOT any private booklet record.
     bookletRequestStatus: order.bookletRequest?.status ?? null,
     createdAt: order.createdAt.toDate().toISOString(),
@@ -113,6 +126,9 @@ export async function changeEmployeeOrderStatus(
   action: OperatorOrderAction,
   actor: Actor,
   paymentCollected: boolean,
+  bottleReturns?: BottleReturn[],
+  previousBottleReturns: BottleReturn[] = [],
+  paymentDeferred = false,
 ) {
   const db = getFirebaseAdminFirestore();
   const orderRef = db.collection("deliveryOrders").doc(orderId);
@@ -147,6 +163,8 @@ export async function changeEmployeeOrderStatus(
       );
     }
 
+    if (action === "DELIVERED" && (!Number.isSafeInteger(order.totalFils) || order.totalFils < 0 || !["CASH","CLICK","COUPON"].includes(order.paymentMethod))) throw new DeliveryOrderBusinessError("INVALID_AMOUNT", "قيمة الطلب أو طريقة دفعه غير صالحة.");
+    if (paymentDeferred && (action !== "DELIVERED" || order.paymentMethod === "COUPON")) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
     const allocations = order.couponAllocations ?? [];
     const bookletReads = await Promise.all(
       (action === "CANCELLED" || (action === "DELIVERED" && order.paymentMethod === "COUPON"))
@@ -157,9 +175,9 @@ export async function changeEmployeeOrderStatus(
     let shiftRef: FirebaseFirestore.DocumentReference | null = null;
     let shift: FirebaseFirestore.DocumentData | undefined;
     if (action === "DELIVERED" && order.paymentMethod !== "COUPON") {
-      if (paymentCollected !== true) {
+      if ((paymentCollected !== true && !paymentDeferred) || (paymentCollected && paymentDeferred)) {
         throw new DeliveryOrderBusinessError(
-          "PAYMENT_NOT_CONFIRMED", "أكد استلام المبلغ قبل تسجيل التسليم.",
+          "PAYMENT_NOT_CONFIRMED", "أكد استلام المبلغ أو اختر «باقي على العميل» قبل التسليم.",
         );
       }
       const shiftIndex = await tx.get(activeShiftRef);
@@ -170,7 +188,7 @@ export async function changeEmployeeOrderStatus(
       shiftRef = db.collection("shifts").doc(shiftId);
       const shiftSnapshot = await tx.get(shiftRef);
       shift = shiftSnapshot.data();
-      if (!shift || shift.status !== SHIFT_STATUSES.OPEN ||
+      if (!shift || shift.storeAuthUid !== actor.storeAuthUid || shift.status !== SHIFT_STATUSES.OPEN ||
           shift.openedByEmployeeId !== actor.employeeId) {
         throw new DeliveryOrderBusinessError(
           "NO_SHIFT", "لا يمكنك التحصيل بدون شفت مفتوح باسمك.",
@@ -195,6 +213,10 @@ export async function changeEmployeeOrderStatus(
       }
     }
 
+    // Orders not yet prepared can adopt the new reservation timing safely.
+    const inventoryPlan:InventoryPlan|null|undefined=action==="READY"&&order.inventoryPlan?{...order.inventoryPlan,merchandiseDeductionStage:"DELIVERED"}:order.inventoryPlan;
+    const inventory = await prepareInventoryTransition(tx, db, inventoryPlan, order.status, action, bottleReturns, { operationId: `order:${orderId}:${action}`, actor: { id: actor.employeeId, name: actor.employeeName, type: "EMPLOYEE" }, customerId: order.customerId, customerName: order.customerNameSnapshot, orderId }, previousBottleReturns);
+    inventory.commit();
     // No more reads beyond this point: all changes commit atomically.
     const now = Timestamp.now();
     const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
@@ -207,6 +229,7 @@ export async function changeEmployeeOrderStatus(
     };
 
     if (action === "READY") {
+      if(inventoryPlan)update.inventoryPlan=inventoryPlan;
       update.readyAt = now;
       update.readyByEmployeeId = actor.employeeId;
       update.readyByEmployeeName = actor.employeeName;
@@ -230,6 +253,8 @@ export async function changeEmployeeOrderStatus(
 
     if (action === "DELIVERED") {
       update.deliveredAt = now;
+      update.bottleReturns = bottleReturns ?? [];
+      update.previousBottleReturns = inventory.previousReturns;
       update.deliveredByEmployeeId = actor.employeeId;
       update.deliveredByEmployeeName = actor.employeeName;
 
@@ -248,11 +273,15 @@ export async function changeEmployeeOrderStatus(
             employeeId: actor.employeeId, createdAt: now,
           });
         }
+        if ((order.pendingCouponQuantity ?? 0) > 0) openOrderReceivable(tx, db, orderId, order, now, "COUPON", order.pendingCouponQuantity!);
         // A new booklet requested by the customer cannot be activated or
         // charged here. The deferred quantity must be reconciled by admin.
         update.paymentState = (order.pendingCouponQuantity ?? 0) > 0
           ? "AWAITING_BOOKLET_APPROVAL"
           : "COUPONS_SETTLED";
+      } else if (paymentDeferred && order.totalFils > 0) {
+        update.paymentState = "PAYMENT_DUE"; update.collectedFils = 0; update.collectionMode = "RECEIPTS";
+        openOrderReceivable(tx, db, orderId, order, now, "MONEY", order.totalFils);
       } else {
         update.paymentState = "COLLECTED";
         update.collectedAt = now;

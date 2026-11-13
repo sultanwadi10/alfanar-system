@@ -25,7 +25,7 @@ export async function GET() {
         success: false,
         error: {
           code: "INTERNAL_ERROR",
-          message: "Unexpected server error.",
+          message: "تعذّر إتمام العملية. حاول مجددًا.",
         },
       },
       {

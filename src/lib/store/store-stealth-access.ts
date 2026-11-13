@@ -1,3 +1,4 @@
+import { trustedRequestFingerprint } from "@/lib/security/request-fingerprint";
 import "server-only";
 
 import {
@@ -170,223 +171,19 @@ function secretValuesMatch(
   );
 }
 
-function getRateLimitState(
-  data:
-    DocumentData | undefined,
-) {
-  return {
-    count:
-      typeof data?.count ===
-        "number"
-        ? data.count
-        : 0,
-
-    windowStartedAt:
-      readTimestamp(
-        data?.windowStartedAt,
-      ),
-
-    blockedUntil:
-      readTimestamp(
-        data?.blockedUntil,
-      ),
-  };
-}
-
-function getRateLimitReference(
-  fingerprint: string,
-) {
-  return getUnlockRateLimitsCollection()
-    .doc(
-      hashValue(
-        fingerprint,
-      ),
-    );
-}
-
-async function isUnlockRateLimited(
-  fingerprint: string,
-) {
-  const snapshot =
-    await getRateLimitReference(
-      fingerprint,
-    ).get();
-
-  if (!snapshot.exists) {
-    return false;
-  }
-
-  const state =
-    getRateLimitState(
-      snapshot.data(),
-    );
-
-  return Boolean(
-    state.blockedUntil &&
-    state.blockedUntil.toMillis() >
-      Date.now(),
-  );
-}
-
-async function registerFailedUnlockAttempt(
-  fingerprint: string,
-) {
-  const db =
-    getFirebaseAdminFirestore();
-
-  const ref =
-    getRateLimitReference(
-      fingerprint,
-    );
-
-  await db.runTransaction(
-    async (transaction) => {
-      const snapshot =
-        await transaction.get(
-          ref,
-        );
-
-      const nowMs =
-        Date.now();
-
-      const now =
-        Timestamp.fromMillis(
-          nowMs,
-        );
-
-      const state =
-        getRateLimitState(
-          snapshot.exists
-            ? snapshot.data()
-            : undefined,
-        );
-
-      const windowExpired =
-        !state.windowStartedAt ||
-        nowMs -
-          state.windowStartedAt.toMillis() >=
-          STORE_STEALTH_ACCESS_CONFIG
-            .ATTEMPT_WINDOW_MS;
-
-      const nextCount =
-        windowExpired
-          ? 1
-          : state.count + 1;
-
-      const shouldBlock =
-        nextCount >=
-        STORE_STEALTH_ACCESS_CONFIG
-          .MAX_FAILED_ATTEMPTS;
-
-      transaction.set(
-        ref,
-        {
-          count:
-            nextCount,
-
-          windowStartedAt:
-            windowExpired
-              ? now
-              : state.windowStartedAt,
-
-          blockedUntil:
-            shouldBlock
-              ? Timestamp.fromMillis(
-                  nowMs +
-                    STORE_STEALTH_ACCESS_CONFIG
-                      .BLOCK_MS,
-                )
-              : null,
-
-          updatedAt:
-            now,
-        },
-        {
-          merge: true,
-        },
-      );
-    },
-  );
-}
-
-async function clearFailedUnlockAttempts(
-  fingerprint: string,
-) {
-  try {
-    await getRateLimitReference(
-      fingerprint,
-    ).delete();
-  } catch {
-    // Best-effort cleanup after a valid unlock.
-  }
-}
-
-export function buildStoreStealthRequestFingerprint(
-  request: Request,
-) {
-  const forwardedFor =
-    request.headers.get(
-      "x-forwarded-for",
-    );
-
-  const ip =
-    forwardedFor
-      ?.split(",")[0]
-      ?.trim() ||
-    request.headers.get(
-      "x-real-ip",
-    ) ||
-    "local";
-
-  const userAgent =
-    request.headers.get(
-      "user-agent",
-    ) ||
-    "unknown";
-
-  return `${ip}|${userAgent}`;
-}
-
-export async function verifyStoreStealthUnlock(
-  input: {
-    code: string;
-    fingerprint: string;
-  },
-) {
-  const expectedCode =
-    configuredUnlockCode();
-
-  if (!expectedCode) {
-    return false;
-  }
-
-  if (
-    await isUnlockRateLimited(
-      input.fingerprint,
-    )
-  ) {
-    return false;
-  }
-
-  const matches =
-    secretValuesMatch(
-      expectedCode,
-      input.code,
-    );
-
-  if (!matches) {
-    await registerFailedUnlockAttempt(
-      input.fingerprint,
-    );
-
-    return false;
-  }
-
-  await clearFailedUnlockAttempts(
-    input.fingerprint,
-  );
-
-  return true;
+export function buildStoreStealthRequestFingerprint(request:Request){return trustedRequestFingerprint(request,"store-unlock");}
+export async function verifyStoreStealthUnlock(input:{code:string;fingerprint:string}){
+ const expected=configuredUnlockCode();if(!expected||!/^\d{10}$/.test(input.code))return false;
+ const db=getFirebaseAdminFirestore(),ref=getUnlockRateLimitsCollection().doc(hashValue(input.fingerprint));
+ return db.runTransaction(async tx=>{
+  const snapshot=await tx.get(ref),data=snapshot.data(),nowMs=Date.now(),now=Timestamp.fromMillis(nowMs);
+  if(data?.blockedUntil instanceof Timestamp&&data.blockedUntil.toMillis()>nowMs)return false;
+  if(secretValuesMatch(expected,input.code)){if(snapshot.exists)tx.delete(ref);return true;}
+  const active=data?.windowStartedAt instanceof Timestamp&&nowMs-data.windowStartedAt.toMillis()<STORE_STEALTH_ACCESS_CONFIG.ATTEMPT_WINDOW_MS;
+  const count=active&&Number.isSafeInteger(data?.count)?data!.count+1:1;
+  tx.set(ref,{count,windowStartedAt:active?data!.windowStartedAt:now,blockedUntil:count>=STORE_STEALTH_ACCESS_CONFIG.MAX_FAILED_ATTEMPTS?Timestamp.fromMillis(nowMs+STORE_STEALTH_ACCESS_CONFIG.BLOCK_MS):null,updatedAt:now});
+  return false;
+ });
 }
 
 export async function createStoreStealthAccessGrant() {

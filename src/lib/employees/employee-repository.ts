@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 import type {
@@ -17,6 +17,7 @@ type CreateEmployeeRecordInput = {
 };
 
 export type EmployeeAuthRecord = {
+  authVersion?: number;
   id: string;
   name: string;
   isActive: boolean;
@@ -145,6 +146,7 @@ export async function getEmployeeAuthRecord(
     name: record.name,
     isActive: record.isActive,
     pinHash: record.pinHash,
+    authVersion: record.authVersion ?? 0,
   };
 }
 
@@ -171,6 +173,7 @@ export async function updateEmployeeActiveStatus(
 
   await employeeRef.update({
     isActive,
+    authVersion: FieldValue.increment(1),
     updatedAt: Timestamp.now(),
   });
 
@@ -200,6 +203,7 @@ export async function updateEmployeePinHash(
 
   await employeeRef.update({
     pinHash,
+    authVersion: FieldValue.increment(1),
     updatedAt: Timestamp.now(),
   });
 

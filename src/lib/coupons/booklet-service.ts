@@ -1,6 +1,8 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { registerCanonicalBooklet } from "./booklet-serials";
+import { BookletError } from "./booklet-error";
+export { BookletError } from "./booklet-error";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
@@ -45,12 +47,6 @@ type Booklet = {
   updatedAt?: Timestamp;
 };
 
-export class BookletError extends Error {
-  constructor(public code: string, message: string) {
-    super(message);
-    this.name = "BookletError";
-  }
-}
 
 function iso(value: unknown): string | null {
   return value instanceof Timestamp ? value.toDate().toISOString() : null;
@@ -113,7 +109,8 @@ export async function getAdminCouponDashboard(cursor?: string) {
       return {
         orderId: d.id,
         customerId: data.customerId as string,
-        employeeName: data.employeeNameSnapshot as string,
+        employeeName: String(data.employeeNameSnapshot ?? "الإدارة"),
+        channel: data.channel ?? "DELIVERY",serial: data.serial ?? "",financialDate:data.financialDate??"",financialPeriod:data.financialPeriod??"",
         priceFils: data.priceFils as number,
         paymentMethod: data.paymentMethod as string,
         createdAt: iso(data.createdAt),
@@ -130,30 +127,7 @@ export async function updateBookletPrice(priceFils: number, adminUid: string) {
   await db().collection(SETTINGS).doc("standard").set({ priceFils, updatedByAdminUid: adminUid, updatedAt: Timestamp.now() }, { merge: true });
 }
 
-export async function registerPhysicalBooklet(serialInput: string, adminUid: string) {
-  const serial = serialInput.trim().toUpperCase();
-  if (!/^[A-Z0-9][A-Z0-9\-]{3,39}$/.test(serial)) {
-    throw new BookletError("INVALID_SERIAL", "رقم الدفتر يجب أن يكون 4–40 خانة من الحروف الإنجليزية أو الأرقام أو -.");
-  }
-  const id = createHash("sha256").update(serial).digest("hex");
-  const ref = db().collection(BOOKLETS).doc(id);
-  const now = Timestamp.now();
-  try {
-    await ref.create({
-      serial, status: "IN_STOCK", customerId: null, orderId: null,
-      issuedCoupons: MAX_COUPONS, remainingCoupons: 0, reservedCoupons: 0,
-      createdAt: now, updatedAt: now, createdByAdminUid: adminUid,
-    });
-  } catch (error) {
-    // Firestore create() fails if serial already exists.
-    if ((error as { code?: string | number }).code === 6 ||
-      (error as { code?: string | number }).code === "already-exists") {
-      throw new BookletError("SERIAL_EXISTS", "رقم هذا الدفتر مسجل مسبقًا.");
-    }
-    throw error;
-  }
-  return id;
-}
+export async function registerPhysicalBooklet(serialInput: string, adminUid: string) { return registerCanonicalBooklet(serialInput, adminUid); }
 
 // Only the current employee may attest that the physical booklet was handed over
 // and its configured price was collected. The serial remains ADMIN-ONLY.
@@ -212,9 +186,7 @@ export async function confirmBookletHandover(
       return b.status === "ACTIVE" && Number.isSafeInteger(b.remainingCoupons)
         ? count + b.remainingCoupons : count;
     }, 0);
-    if (existingCoupons !== 0) {
-      throw new BookletError("LIMIT_22", "لا يمكن بيع دفتر جديد لهذا العميل قبل نفاد رصيده الحالي. راجع الإدارة.");
-    }
+    void existingCoupons;
     const shiftId = activeShiftDoc.data()?.shiftId as string | undefined;
     if (!shiftId) throw new BookletError("NO_SHIFT", "يجب فتح شفت لتحصيل ثمن الدفتر.");
     const shiftRef = database.collection("shifts").doc(shiftId);
@@ -299,17 +271,21 @@ export async function approveBookletRequest(orderId: string, bookletId: string, 
         existing += row.remainingCoupons;
       }
     }
-    // One full booklet is 22. No over-issuing above the existing per-customer cap.
-    if (existing + MAX_COUPONS > MAX_COUPONS) {
-      throw new BookletError("LIMIT_22", "لا يمكن اعتماد دفتر جديد قبل استهلاك الكوبونات الفعلية المتبقية. حد الرصيد النشط 22 كوبونًا.");
-    }
+    // The limit is per physical booklet, never the combined customer balance.
+    void existing;
     const pending = order.pendingCouponQuantity ?? 0;
-    if (!Number.isSafeInteger(pending) || pending < 0 || pending > MAX_COUPONS ||
+    if (!Number.isSafeInteger(pending) || pending < 0 ||
         (pending > 0 && order.paymentState !== "AWAITING_BOOKLET_APPROVAL")) {
       throw new BookletError("INVALID_PENDING", "كمية الكوبونات المعلقة غير متسقة.");
     }
     const now = Timestamp.now();
-    const remaining = MAX_COUPONS - pending;
+    const consumed = Math.min(MAX_COUPONS, pending);
+    const stillDue = pending - consumed;
+    const debtRef = database.collection("customerReceivables").doc(`order_${orderId}`);
+    const debtDoc = await tx.get(debtRef);
+    const debt = debtDoc.data();
+    if (debt && (debt.kind !== "COUPON" || debt.customerId !== order.customerId || debt.outstanding !== pending || !Number.isSafeInteger(debt.settled) || debt.settled < 0 || !Number.isSafeInteger(debt.original) || debt.original !== debt.settled + pending)) throw new BookletError("INVALID_PENDING", "رصيد المستحق غير متطابق مع الطلب.");
+    const remaining = MAX_COUPONS - consumed;
     tx.update(bookletRef, {
       status: remaining > 0 ? "ACTIVE" : "EXHAUSTED",
       customerId: order.customerId, orderId,
@@ -325,10 +301,11 @@ export async function approveBookletRequest(orderId: string, bookletId: string, 
       "bookletRequest.bookletId": bookletId,
       "bookletRequest.approvedByAdminUid": adminUid,
       "bookletRequest.approvedAt": now,
-      pendingCouponQuantity: 0,
-      ...(order.paymentState === "AWAITING_BOOKLET_APPROVAL" ? { paymentState: "COUPONS_SETTLED" } : {}),
+      pendingCouponQuantity: stillDue,
+      ...(order.paymentState === "AWAITING_BOOKLET_APPROVAL" ? { paymentState: stillDue ? "AWAITING_BOOKLET_APPROVAL" : "COUPONS_SETTLED" } : {}),
       updatedAt: now,
     });
+    if (debt) tx.update(debtRef, { outstanding: stillDue, settled: debt.settled + consumed, status: stillDue ? "OPEN" : "SETTLED", updatedAt: now, lastSettledByAdminUid: adminUid });
     // This write serializes concurrent approvals for the same customer.
     tx.update(customerRef, { pendingBookletSaleOrderId: FieldValue.delete(), updatedAt: now });
     tx.create(database.collection(EVENTS).doc(`ISSUE_${orderId}`), {
@@ -338,10 +315,10 @@ export async function approveBookletRequest(orderId: string, bookletId: string, 
     if (pending > 0) {
       tx.create(database.collection(EVENTS).doc(`DEBIT_${orderId}`), {
         type: "ORDER_DEBIT", bookletId, customerId: order.customerId, orderId,
-        quantity: pending, adminUid, createdAt: now,
+        quantity: consumed, adminUid, createdAt: now,
       });
     }
-    return { unchanged: false, remaining, consumed: pending };
+    return { unchanged: false, remaining, consumed };
   });
 }
 
@@ -385,7 +362,7 @@ export async function countCustomerDeliveryOrders(customerId: string): Promise<n
 
 /**
  * Admin-only physical assignment. This is NOT a cash sale and never
- * increments shifts or sales collections. Requires an explicit reason.
+ * increments shifts or sales collections. Records an automatic action description.
  * The physical serial stays unchanged and is immutable after assignment.
  */
 export async function assignBookletToCustomer(input: {
@@ -423,7 +400,7 @@ export async function assignBookletToCustomer(input: {
       }
       totalRemaining += record.remainingCoupons;
     }
-    if (totalRemaining !== 0) throw new BookletError("LIMIT_22", "رصيد العميل الفعلي لم ينفد؛ لا يمكن إصدار دفتر جديد قبل استهلاكه.");
+    void totalRemaining;
     const now = Timestamp.now();
     tx.update(bookletRef, {
       status: "ACTIVE", customerId: input.customerId, orderId: null,

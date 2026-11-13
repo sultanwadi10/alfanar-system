@@ -1,9 +1,15 @@
 .page {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  overscroll-behavior: none;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
   box-sizing: border-box;
   padding:
     max(18px, env(safe-area-inset-top))
@@ -26,6 +32,9 @@
   width: min(100%, 390px);
   display: grid;
   gap: 18px;
+  flex: 0 0 auto;
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 .display {
@@ -118,11 +127,15 @@
 }
 
 .pairingOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: grid;
-  place-items: center;
   padding: 20px;
   background: rgba(4, 7, 10, 0.88);
   backdrop-filter: blur(14px);
@@ -137,6 +150,9 @@
   border-radius: 18px;
   background: #11151a;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  flex: 0 0 auto;
+  margin-top: auto;
+  margin-bottom: auto;
 }
 
 .pairingHeader {
@@ -302,4 +318,17 @@
   .key {
     transition: none;
   }
+}
+
+/* Keep every key reachable in short landscape windows and when browser bars are visible. */
+
+@media (max-height: 600px) {
+  .page {
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .calculator { gap: 10px; }
+  .display { min-height: 86px; padding-top: 6px; }
+  .operationHint { min-height: 18px; font-size: 0.95rem; }
+  .keypad { gap: 8px; }
+  .key { min-height: 48px; border-radius: 16px; font-size: 1.3rem; }
 }

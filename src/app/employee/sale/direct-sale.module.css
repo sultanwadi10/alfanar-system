@@ -1,18 +1,18 @@
 .page {
-  --sale-bg: #eaf2f7;
-  --sale-surface: #f7fafc;
-  --sale-surface-2: #eef4f8;
-  --sale-surface-3: #e5eef5;
-  --sale-text: #142433;
-  --sale-muted: #62788a;
-  --sale-border: #cfdde7;
-  --sale-primary: #2563eb;
-  --sale-primary-hover: #1d4ed8;
-  --sale-primary-soft: #e6efff;
-  --sale-success: #15803d;
-  --sale-success-bg: #dcfce7;
-  --sale-danger: #b91c1c;
-  --sale-danger-bg: #fee2e2;
+  --sale-bg: var(--store-ui-bg, #eaf2f7);
+  --sale-surface: var(--store-ui-card, #f7fafc);
+  --sale-surface-2: var(--store-ui-soft, #eef4f8);
+  --sale-surface-3: var(--store-ui-soft, #e5eef5);
+  --sale-text: var(--store-ui-text, #142433);
+  --sale-muted: var(--store-ui-muted, #62788a);
+  --sale-border: var(--store-ui-border, #cfdde7);
+  --sale-primary: var(--store-ui-primary, #2563eb);
+  --sale-primary-hover: var(--store-ui-primary-hover, #1d4ed8);
+  --sale-primary-soft: var(--store-ui-soft-blue, #e6efff);
+  --sale-success: var(--store-ui-success, #15803d);
+  --sale-success-bg: var(--store-ui-success-bg, #dcfce7);
+  --sale-danger: var(--store-ui-danger, #b91c1c);
+  --sale-danger-bg: var(--store-ui-danger-bg, #fee2e2);
   --sale-shadow:
     0 18px 50px rgba(15, 40, 65, 0.08);
 
@@ -24,20 +24,20 @@
 }
 
 :global(html[data-theme="dark"]) .page {
-  --sale-bg: #0d1722;
-  --sale-surface: #162534;
-  --sale-surface-2: #1b2c3c;
-  --sale-surface-3: #213548;
-  --sale-text: #f1f5f9;
-  --sale-muted: #a9bbc9;
-  --sale-border: #2a4053;
-  --sale-primary: #60a5fa;
-  --sale-primary-hover: #3b82f6;
-  --sale-primary-soft: #162e49;
-  --sale-success: #86efac;
-  --sale-success-bg: #163b2a;
-  --sale-danger: #fca5a5;
-  --sale-danger-bg: #442326;
+  --sale-bg: var(--store-ui-bg, #0d1722);
+  --sale-surface: var(--store-ui-card, #162534);
+  --sale-surface-2: var(--store-ui-soft, #1b2c3c);
+  --sale-surface-3: var(--store-ui-soft, #213548);
+  --sale-text: var(--store-ui-text, #f1f5f9);
+  --sale-muted: var(--store-ui-muted, #a9bbc9);
+  --sale-border: var(--store-ui-border, #2a4053);
+  --sale-primary: var(--store-ui-primary, #60a5fa);
+  --sale-primary-hover: var(--store-ui-primary-hover, #3b82f6);
+  --sale-primary-soft: var(--store-ui-soft-blue, #162e49);
+  --sale-success: var(--store-ui-success, #86efac);
+  --sale-success-bg: var(--store-ui-success-bg, #163b2a);
+  --sale-danger: var(--store-ui-danger, #fca5a5);
+  --sale-danger-bg: var(--store-ui-danger-bg, #442326);
   --sale-shadow:
     0 20px 55px rgba(0, 0, 0, 0.22);
 }
@@ -232,7 +232,7 @@
 
 .categoryChipActive {
   border: 1px solid var(--sale-primary);
-  background: var(--sale-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
 }
 
@@ -295,44 +295,13 @@
   place-items: center;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--sale-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
   font-size: 0.76rem;
   font-weight: 900;
   box-shadow:
     0 5px 12px
     rgba(0, 0, 0, 0.16);
-}
-
-.productImage {
-  aspect-ratio: 16 / 8.5;
-  display: grid;
-  place-items: center;
-  background:
-    linear-gradient(
-      145deg,
-      var(--sale-surface-2),
-      var(--sale-surface-3)
-    );
-  background-position: center;
-  background-size: cover;
-}
-
-.placeholderDrop {
-  width: 58px;
-  height: 58px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background:
-    color-mix(
-      in srgb,
-      var(--sale-primary) 12%,
-      var(--sale-surface)
-    );
-  color: var(--sale-primary);
-  font-size: 0.8rem;
-  font-weight: 900;
 }
 
 .productInfo {
@@ -537,7 +506,7 @@
   margin-top: 14px;
   border: 0;
   border-radius: 13px;
-  background: var(--sale-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
   cursor: pointer;
   font: inherit;
@@ -653,7 +622,7 @@
 .paymentGrid {
   display: grid;
   grid-template-columns:
-    1fr 1fr;
+    minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   margin-top: 17px;
 }
@@ -722,7 +691,7 @@
   margin-top: 16px;
   border: 0;
   border-radius: 12px;
-  background: var(--sale-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
   cursor: pointer;
   font: inherit;
@@ -784,7 +753,7 @@
 .successActions {
   display: grid;
   grid-template-columns:
-    1fr 1fr;
+    minmax(0, 1fr) minmax(0, 1fr);
   gap: 9px;
 }
 
@@ -836,7 +805,7 @@
 
   .layout {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 
   .cartSide {
@@ -876,7 +845,7 @@
   .paymentGrid,
   .successActions {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 
   .paymentModal,
@@ -897,3 +866,13 @@
     transition: none;
   }
 }
+/* Compact cards keep the full product name and price visible on touch screens. */
+.productCard{min-height:148px;display:flex;align-items:stretch}.productInfo{width:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:18px 16px;gap:5px;min-width:0}.productInfo small{padding-inline-end:32px}.productInfo strong{overflow-wrap:anywhere;min-height:44px}.productInfo b{margin-top:auto;padding-top:10px;color:var(--sale-primary)}.categoryChip,.categoryChipActive{min-height:44px}.productCard:focus-visible{outline:3px solid var(--sale-primary);outline-offset:3px}@media(max-width:600px){.productsGrid{gap:10px}.productCard{min-height:138px}.productInfo{padding:15px 12px}.productInfo strong{font-size:.95rem}}
+
+/* Responsive viewport containment. */
+
+.modalOverlay { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.modalOverlay { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.paymentModal, .successModal { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.paymentModal > *, .successModal > * { min-width: 0; }
+@media (max-width: 600px) { .paymentModal, .successModal { padding: 18px 14px; border-radius: 16px; } }

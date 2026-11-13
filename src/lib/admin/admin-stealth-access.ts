@@ -1,3 +1,4 @@
+import { trustedRequestFingerprint } from "@/lib/security/request-fingerprint";
 
 import "server-only";
 
@@ -6,7 +7,6 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
-import { isIP } from "node:net";
 import { cookies } from "next/headers";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -101,33 +101,7 @@ function parseAccessCookie(
  * User-Agent is intentionally excluded
  * because the client can change it.
  */
-export function buildAdminStealthRequestFingerprint(
-  request: Request,
-) {
-  const forwardedIp =
-    process.env.VERCEL === "1"
-      ? (
-          request.headers.get(
-            "x-vercel-forwarded-for",
-          ) ??
-          request.headers.get(
-            "x-forwarded-for",
-          )
-        )
-      : null;
-
-  const candidateIp = forwardedIp
-    ?.split(",")[0]
-    ?.trim();
-
-  const trustedIp =
-    candidateIp &&
-    isIP(candidateIp) !== 0
-      ? candidateIp
-      : "local";
-
-  return `admin-ip:${trustedIp}`;
-}
+export function buildAdminStealthRequestFingerprint(request:Request){return trustedRequestFingerprint(request,"admin-ip");}
 
 /**
  * Validate the admin code while enforcing

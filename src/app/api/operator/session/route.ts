@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
 import {
@@ -11,11 +12,7 @@ import {
   listActiveEmployees,
 } from "@/lib/employees/employee-repository";
 import { getEmployeeCurrentScheduleAccess } from "@/lib/employees/employee-schedule-repository";
-import {
-  clearFailedPinAttempts,
-  getPinLockState,
-  registerFailedPinAttempt,
-} from "@/lib/security/employee-pin-attempts";
+import { reservePinVerification,clearSuccessfulPinVerification } from "@/lib/security/pin-verification-attempt";
 import { verifyEmployeePin } from "@/lib/security/employee-pin";
 import { getStoreSecurityContext } from "@/lib/security/get-store-security-context";
 import { hasValidOrigin } from "@/lib/security/has-valid-origin";
@@ -31,6 +28,7 @@ export async function GET() {
     const operator =
       await resolveOperatorSession(
         storeContext.authUid,
+        { handoverOnly: true },
       );
 
     if (operator) {
@@ -117,7 +115,7 @@ export async function GET() {
   }
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
 ) {
   try {
@@ -263,13 +261,13 @@ export async function POST(
     }
 
     const lockState =
-      await getPinLockState(
+      await reservePinVerification(
         storeContext.authUid,
         employee.id,
       );
 
     if (
-      lockState.locked
+      !lockState.allowed
     ) {
       return NextResponse.json(
         {
@@ -296,11 +294,7 @@ export async function POST(
       );
 
     if (!pinValid) {
-      const failure =
-        await registerFailedPinAttempt(
-          storeContext.authUid,
-          employee.id,
-        );
+      const failure = lockState;
 
       return NextResponse.json(
         {
@@ -360,9 +354,10 @@ export async function POST(
       );
     }
 
-    await clearFailedPinAttempts(
+    await clearSuccessfulPinVerification(
       storeContext.authUid,
       employee.id,
+      lockState.attemptId,
     );
 
     /*
@@ -450,7 +445,7 @@ export async function POST(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   request: Request,
 ) {
   try {
@@ -539,3 +534,6 @@ export async function DELETE(
     );
   }
 }
+export const POST = withOperationChanges(handlePOST, ["access","home"]);
+
+export const DELETE = withOperationChanges(handleDELETE, ["access","home"]);

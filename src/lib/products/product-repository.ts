@@ -17,6 +17,8 @@ const PRODUCTS_COLLECTION =
   "products";
 
 type ProductRecord = {
+  bottleSizeMl?: number;
+  deliveryEnabled?: boolean;
   name: string;
 
   category: Product["category"];
@@ -435,6 +437,8 @@ function toProduct(
 
   return {
     id: snapshot.id,
+    bottleSizeMl: data.bottleSizeMl,
+    deliveryEnabled: data.deliveryEnabled !== false,
 
     name: data.name,
 

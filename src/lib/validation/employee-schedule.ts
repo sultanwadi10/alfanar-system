@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { shiftTimesOverlap } from "@/lib/shifts/shift-payroll";
 
 import { EMPLOYEE_SHIFT_TYPES } from "@/types/employee-schedule";
 
@@ -90,4 +91,4 @@ export const shiftTimeSettingsSchema =
         message:
           "بداية ونهاية الشفت المسائي لا يمكن أن تكونا نفس الوقت.",
       },
-    );
+    ).refine(value => !shiftTimesOverlap(value), { message: "أوقات الصباحي والمسائي متداخلة. اجعل نهاية أحدهما قبل بداية الآخر أو عندها." });

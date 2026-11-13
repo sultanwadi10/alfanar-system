@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
@@ -11,7 +12,7 @@ const schema = z.object({ paymentMethod: z.enum(["CASH", "CLICK"]), expectedPric
 function fail(message: string, code: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
-export async function POST(request: Request, context: { params: Promise<{ orderId: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ orderId: string }> }) {
   try {
     const store = await getStoreSecurityContext();
     const operator = await resolveOperatorSession(store.authUid);
@@ -34,3 +35,5 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
     return fail("تعذر تسجيل تسليم الدفتر.", "INTERNAL_ERROR", 500);
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home"]);

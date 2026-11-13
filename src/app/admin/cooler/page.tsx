@@ -1,12 +1,3 @@
-export default function CoolerPage() {
-  return (
-    <section>
-      <h1>الثلاجة</h1>
-
-      <p>
-        سيتم إدارة مخزون الثلاجة
-        وطلبات إعادة التعبئة من هنا.
-      </p>
-    </section>
-  );
-}
+import CoolerManager from "./cooler-manager";
+import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
+export default async function CoolerPage() { await getAdminSecurityContext(); return <CoolerManager/>; }

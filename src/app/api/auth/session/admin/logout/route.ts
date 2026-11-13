@@ -19,7 +19,7 @@ export async function POST(request: Request) {
         success: false,
         error: {
           code: "INVALID_ORIGIN",
-          message: "The request origin is not allowed.",
+          message: "الطلب غير مسموح.",
         },
       },
       { status: 403 },

@@ -1,0 +1,8 @@
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.actions .call,.actions .whatsapp{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;border:1px solid var(--border,#d7e3ee);border-radius:11px;font:inherit;font-size:14px;font-weight:700;text-decoration:none;line-height:1.5;touch-action:manipulation}
+.actions .call{color:var(--accent,#215cda);background:var(--card,#fff)}
+.actions .whatsapp{color:#fff;background:#087f5b;border-color:#087f5b}
+.actions .whatsapp:hover{background:#066849;border-color:#066849}
+.actions a:focus-visible{outline:3px solid var(--accent,#215cda);outline-offset:3px}
+.actions svg{width:22px;height:22px;flex:none}
+@media(max-width:360px){.actions .call,.actions .whatsapp{width:100%}}

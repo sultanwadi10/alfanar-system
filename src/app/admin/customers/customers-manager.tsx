@@ -1,4 +1,7 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
+import { useConfirmation } from "@/lib/client/use-confirmation";
 
 import {
   type FormEvent,
@@ -47,6 +50,7 @@ export function CustomersManager({
   activeCustomers,
   archivedCustomers,
 }: CustomersManagerProps) {
+  const { confirm, confirmationDialog } = useConfirmation();
   const router = useRouter();
 
   const [view, setView] =
@@ -97,6 +101,7 @@ export function CustomersManager({
     successMessage,
     setSuccessMessage,
   ] = useState("");
+  useTransientMessage(successMessage, setSuccessMessage);
 
   const visibleCustomers =
     view === "active"
@@ -202,8 +207,8 @@ export function CustomersManager({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-            "تعذر إنشاء العميل.",
+          userMessage(data?.error?.message ??
+            "تعذر إنشاء العميل."),
         );
 
         return;
@@ -224,7 +229,7 @@ export function CustomersManager({
       router.refresh();
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء الاتصال بالخدمة.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -235,9 +240,7 @@ export function CustomersManager({
     customerId: string,
   ) {
     const confirmed =
-      window.confirm(
-        "هل تريد استعادة هذا العميل إلى قائمة العملاء النشطين؟",
-      );
+      await confirm({"title":"استعادة العميل؟","confirmLabel":"استعادة","tone":"info"});
 
     if (!confirmed) {
       return;
@@ -267,8 +270,8 @@ export function CustomersManager({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-            "تعذر استعادة العميل.",
+          userMessage(data?.error?.message ??
+            "تعذر استعادة العميل."),
         );
 
         return;
@@ -281,7 +284,7 @@ export function CustomersManager({
       router.refresh();
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء استعادة العميل.",
+        userMessage("حدث خطأ أثناء استعادة العميل."),
       );
     } finally {
       setActionCustomerId(
@@ -313,15 +316,7 @@ export function CustomersManager({
             إدارة العملاء
           </h1>
 
-          <p
-            className={
-              styles.subtitle
-            }
-          >
-            إدارة بيانات العملاء،
-            الطلبات، محفظة الكوبونات
-            وربط الحساب بالتطبيق.
-          </p>
+
         </div>
 
         <button
@@ -396,10 +391,7 @@ export function CustomersManager({
             {totalCustomers}
           </strong>
 
-          <small>
-            يشمل العملاء النشطين
-            والمؤرشفين.
-          </small>
+
         </article>
 
         <article
@@ -429,10 +421,7 @@ export function CustomersManager({
             {customersToday}
           </strong>
 
-          <small>
-            سيتم احتسابه تلقائيًا عند
-            ربط نظام الطلبات.
-          </small>
+
         </article>
 
         <article
@@ -464,10 +453,7 @@ export function CustomersManager({
             كوبون
           </strong>
 
-          <small>
-            الكوبونات المتبقية في دفاتر
-            العملاء.
-          </small>
+
         </article>
       </section>
 
@@ -538,11 +524,7 @@ export function CustomersManager({
                 : "العملاء المؤرشفون"}
             </h2>
 
-            <p>
-              {view === "active"
-                ? "ابحث برقم الهاتف أو باسم العميل."
-                : "يمكنك مراجعة العميل المؤرشف واستعادته في أي وقت."}
-            </p>
+
           </div>
 
           <div
@@ -834,11 +816,11 @@ export function CustomersManager({
 
               <p>
                 {searchQuery
-                  ? "جرّب البحث برقم هاتف أو اسم مختلف."
+                  ? "لا توجد نتائج مطابقة."
                   : view ===
                       "archive"
-                    ? "العملاء الذين تتم أرشفتهم سيظهرون هنا ويمكن استعادتهم لاحقًا."
-                    : "عند إضافة أول عميل سيظهر هنا مع بياناته ومحفظة الكوبونات."}
+                    ? "لا يوجد عملاء مؤرشفون."
+                    : "لا يوجد عملاء مسجلون."}
               </p>
 
               {!searchQuery &&
@@ -908,12 +890,7 @@ export function CustomersManager({
                   إضافة ملف عميل
                 </h2>
 
-                <p>
-                  رقم الهاتف سيكون
-                  وسيلة التعرف الأساسية
-                  على العميل وربط حساب
-                  التطبيق مستقبلًا.
-                </p>
+
               </div>
 
               <button
@@ -985,11 +962,7 @@ export function CustomersManager({
                   required
                 />
 
-                <small>
-                  سيتم توحيد الرقم
-                  تلقائيًا ومنع تسجيل
-                  نفس العميل مرتين.
-                </small>
+
               </label>
 
               <label>
@@ -1038,11 +1011,7 @@ export function CustomersManager({
                   }
                 />
 
-                <small>
-                  هذه الملاحظات
-                  إدارية ولن تظهر
-                  للعميل داخل التطبيق.
-                </small>
+
               </label>
 
               <div
@@ -1111,6 +1080,7 @@ export function CustomersManager({
           </section>
         </div>
       )}
+    {confirmationDialog}
     </div>
   );
 }

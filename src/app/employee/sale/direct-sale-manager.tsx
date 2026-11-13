@@ -1,9 +1,14 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useConfirmation } from "@/lib/client/use-confirmation";
+import { useOperationChanges } from "@/lib/client/operation-changes";
+import { newRequestId } from "@/lib/client/request-id";
 
 import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -55,10 +60,10 @@ const categoryLabels: Record<
     "قوارير جديدة",
 
   CUPS:
-    "كاسات",
+    "أكواب",
 
   SHRINK:
-    "شرنك",
+    "شرنكات",
 
   COOLED:
     "مبرد",
@@ -67,48 +72,8 @@ const categoryLabels: Record<
     "أخرى",
 };
 
-const categories: Array<{
-  value:
-    | "ALL"
-    | ProductCategory;
-
-  label: string;
-}> = [
-  {
-    value: "ALL",
-    label:
-      "الكل",
-  },
-  {
-    value: "REFILL",
-    label:
-      "تعبئة",
-  },
-  {
-    value: "NEW_BOTTLE",
-    label:
-      "قوارير",
-  },
-  {
-    value: "CUPS",
-    label:
-      "كاسات",
-  },
-  {
-    value: "SHRINK",
-    label:
-      "شرنك",
-  },
-  {
-    value: "COOLED",
-    label:
-      "مبرد",
-  },
-  {
-    value: "OTHER",
-    label:
-      "أخرى",
-  },
+const categories:Array<{value:"ALL"|ProductCategory;label:string}>=[
+  {value:"REFILL",label:"تعبئة"},{value:"CUPS",label:"أكواب"},{value:"NEW_BOTTLE",label:"قوارير"},{value:"SHRINK",label:"شرنكات"},{value:"COOLED",label:"مبرد"},{value:"OTHER",label:"أخرى"},{value:"ALL",label:"الكل"},
 ];
 
 async function fetchProducts(): Promise<{
@@ -157,7 +122,7 @@ async function fetchProducts(): Promise<{
       products: [],
 
       error:
-        "تعذر الاتصال بالخادم.",
+        "تعذّر الاتصال. حاول مجددًا.",
     };
   }
 }
@@ -181,6 +146,8 @@ function paymentLabel(
 }
 
 export default function DirectSaleManager() {
+  const { confirm, confirmationDialog } = useConfirmation();
+  const saleRequest = useRef<{ fingerprint: string; id: string } | null>(null);
   const router =
     useRouter();
 
@@ -216,7 +183,7 @@ export default function DirectSaleManager() {
     useState<
       ProductCategory |
       "ALL"
-    >("ALL");
+    >("REFILL");
 
   const [
     loading,
@@ -273,7 +240,7 @@ export default function DirectSaleManager() {
         );
 
         setErrorMessage(
-          result.error ?? "",
+          userMessage(result.error ?? ""),
         );
 
         setLoading(
@@ -287,6 +254,10 @@ export default function DirectSaleManager() {
         true;
     };
   }, []);
+
+  useOperationChanges(["catalog"], () => {
+    void fetchProducts().then(result => { if (!result.error) setProducts(result.products); setErrorMessage(userMessage(result.error ?? "")); });
+  }, !submitting && !paymentOpen);
 
   useEffect(() => {
     function handleBeforeUnload(
@@ -456,7 +427,7 @@ export default function DirectSaleManager() {
     );
   }
 
-  function clearCart() {
+  async function clearCart() {
     if (
       cartItems.length ===
       0
@@ -465,9 +436,7 @@ export default function DirectSaleManager() {
     }
 
     const confirmed =
-      window.confirm(
-        "هل تريد تفريغ السلة الحالية؟",
-      );
+      await confirm({"title":"تفريغ السلة؟","confirmLabel":"تفريغ السلة","tone":"warning"});
 
     if (!confirmed) {
       return;
@@ -482,15 +451,13 @@ export default function DirectSaleManager() {
     setErrorMessage("");
   }
 
-  function handleBack() {
+  async function handleBack() {
     if (
       cartItems.length >
       0
     ) {
       const confirmed =
-        window.confirm(
-          "السلة تحتوي على منتجات. هل تريد الخروج وإلغاء العملية الحالية؟",
-        );
+        await confirm({"title":"الخروج من البيع؟","description":"سيتم تفريغ السلة الحالية.","confirmLabel":"خروج","tone":"warning"});
 
       if (!confirmed) {
         return;
@@ -508,7 +475,7 @@ export default function DirectSaleManager() {
       0
     ) {
       setErrorMessage(
-        "أضف منتجًا واحدًا على الأقل.",
+        userMessage("أضف منتجًا واحدًا على الأقل."),
       );
 
       return;
@@ -540,7 +507,7 @@ export default function DirectSaleManager() {
       );
 
       setErrorMessage(
-        "السلة فارغة.",
+        userMessage("السلة فارغة."),
       );
 
       return;
@@ -548,7 +515,7 @@ export default function DirectSaleManager() {
 
     if (!paymentMethod) {
       setErrorMessage(
-        "اختر طريقة الدفع.",
+        userMessage("اختر طريقة الدفع."),
       );
 
       return;
@@ -565,6 +532,8 @@ export default function DirectSaleManager() {
     setErrorMessage("");
 
     try {
+      const fingerprint = JSON.stringify({ cart, paymentMethod });
+      if (!saleRequest.current || saleRequest.current.fingerprint !== fingerprint) saleRequest.current = { fingerprint, id: newRequestId() };
       const response =
         await fetch(
           "/api/operator/direct-sales",
@@ -579,6 +548,7 @@ export default function DirectSaleManager() {
 
             body:
               JSON.stringify({
+                requestId: saleRequest.current.id,
                 paymentMethod,
 
                 items:
@@ -603,8 +573,8 @@ export default function DirectSaleManager() {
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر تسجيل عملية البيع.",
+          userMessage(data?.error?.message ??
+          "تعذر تسجيل عملية البيع."),
         );
 
         return;
@@ -618,6 +588,7 @@ export default function DirectSaleManager() {
           paymentMethod,
         };
 
+      saleRequest.current = null;
       setCart({});
 
       setPaymentMethod(
@@ -633,7 +604,7 @@ export default function DirectSaleManager() {
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setSubmitting(
@@ -680,11 +651,7 @@ export default function DirectSaleManager() {
               بيع مباشر
             </h1>
 
-            <p>
-              اضغط على المنتج
-              لإضافته للسلة، ثم
-              أكمل عملية الدفع.
-            </p>
+
           </div>
         </div>
 
@@ -786,6 +753,7 @@ export default function DirectSaleManager() {
                       ? styles.categoryChipActive
                       : styles.categoryChip
                   }
+                  aria-pressed={category===item.value}
                   onClick={() =>
                     setCategory(
                       item.value,
@@ -872,30 +840,6 @@ export default function DirectSaleManager() {
                           }
                         </span>
                       )}
-
-                      <div
-                        className={
-                          styles.productImage
-                        }
-                        style={
-                          product.imageUrl
-                            ? {
-                                backgroundImage:
-                                  `url("${product.imageUrl}")`,
-                              }
-                            : undefined
-                        }
-                      >
-                        {!product.imageUrl && (
-                          <span
-                            className={
-                              styles.placeholderDrop
-                            }
-                          >
-                            ماء
-                          </span>
-                        )}
-                      </div>
 
                       <div
                         className={
@@ -1004,11 +948,7 @@ export default function DirectSaleManager() {
                   السلة فارغة
                 </strong>
 
-                <small>
-                  اضغط على أي
-                  منتج لإضافته
-                  مباشرة.
-                </small>
+
               </div>
             ) : (
               cartItems.map(
@@ -1136,15 +1076,7 @@ export default function DirectSaleManager() {
               متابعة للدفع
             </button>
 
-            <small
-              className={
-                styles.checkoutHint
-              }
-            >
-              السعر النهائي يتم
-              اعتماده من السيرفر
-              عند تأكيد العملية.
-            </small>
+
           </div>
         </aside>
       </div>
@@ -1422,6 +1354,7 @@ export default function DirectSaleManager() {
           </div>
         </div>
       )}
+    {confirmationDialog}
     </main>
   );
 }

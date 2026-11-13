@@ -1,22 +1,22 @@
 .page {
-  --bg: #edf3f9;
-  --card: #fff;
-  --text: #14283d;
-  --muted: #6d8196;
-  --border: #d7e3ee;
-  --accent: #215cda;
+  --bg: var(--store-ui-bg, #edf3f9);
+  --card: var(--store-ui-card, #fff);
+  --text: var(--store-ui-text, #14283d);
+  --muted: var(--store-ui-muted, #6d8196);
+  --border: var(--store-ui-border, #d7e3ee);
+  --accent: var(--store-ui-primary, #215cda);
   min-height: 100vh;
   padding: 26px 24px 70px;
   background: var(--bg);
   color: var(--text);
 }
 :global(html[data-theme="dark"]) .page {
-  --bg: #0e1924;
-  --card: #172737;
-  --text: #edf4fc;
-  --muted: #9db1c4;
-  --border: #2d4358;
-  --accent: #78a8ff;
+  --bg: var(--store-ui-bg, #0e1924);
+  --card: var(--store-ui-card, #172737);
+  --text: var(--store-ui-text, #edf4fc);
+  --muted: var(--store-ui-muted, #9db1c4);
+  --border: var(--store-ui-border, #2d4358);
+  --accent: var(--store-ui-primary, #78a8ff);
 }
 .page * { box-sizing: border-box; }
 .page button, .page input { font: inherit; }
@@ -30,7 +30,7 @@
 .headerActions { display: flex; gap: 9px; flex-wrap: wrap; }
 .headerActions button { min-height: 43px; padding: 0 15px; border: 1px solid var(--border); border-radius: 11px; color: var(--text); background: var(--card); font-weight: 800; }
 .headerActions .primary { background: #225dde; color: #fff; border-color: #225dde; }
-.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; margin-bottom: 20px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 20px; }
 .stat { padding: 17px 19px; border: 1px solid var(--border); background: var(--card); border-radius: 16px; display: grid; gap: 5px; }
 .stat span { font-size: .77rem; color: var(--muted); }
 .stat strong { font-size: 1.85rem; font-variant-numeric: tabular-nums; }
@@ -81,6 +81,14 @@
 .detailItem strong { white-space: nowrap; }
 .detailTotal { display: flex; justify-content: space-between; gap: 10px; font-size: .82rem; padding-top: 12px; border-top: 1px solid var(--border); }
 .detailActions { display: flex; gap: 10px; flex-wrap: wrap; }
+:global(html[data-theme="dark"]) .new { background: #3c321b; color: #ffd27b; }
+:global(html[data-theme="dark"]) .ready { background: #12345b; color: #a5cdff; }
+:global(html[data-theme="dark"]) .delivered { background: #084325; color: #8bf897; }
+:global(html[data-theme="dark"]) .cancelled { background: #492626; color: #ffb5b5; }
+:global(html[data-theme="dark"]) .bookletNote { background: #3c321b; color: #ffd27b; }
+:global(html[data-theme="dark"]) .error { background: #492626; color: #ffb5b5; border-color: #8d414a; }
+:global(html[data-theme="dark"]) .buttons .cancelButton,
+:global(html[data-theme="dark"]) .detailActions .cancelButton { background: #492626; color: #ffb5b5; border-color: #8d414a; }
 @media(max-width: 1150px) { .cards { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width: 700px) {
   .page { padding: 13px 12px 50px; }
@@ -91,7 +99,7 @@
   .stat { padding: 12px 14px; }
   .stat strong { font-size: 1.6rem; }
   .board { padding: 13px; }
-  .cards { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
   .toolbar { align-items: stretch; flex-direction: column; }
   .toolbar input { flex-basis: auto; width: 100%; }
   .filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
@@ -100,3 +108,11 @@
   .details { border-radius: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before { transition: none !important; } }
+
+/* Responsive viewport containment. */
+
+.overlay { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.overlay { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.details { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.details > * { min-width: 0; }
+@media (max-width: 600px) { .details { padding: 18px 14px; border-radius: 16px; } }

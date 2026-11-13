@@ -44,7 +44,7 @@ function createAuthenticationFailedResponse() {
       error: {
         code: "AUTHENTICATION_FAILED",
         message:
-          "The admin session could not be created.",
+          "تعذّر تسجيل دخول الإدارة. حاول مجددًا.",
       },
     },
     {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
           error: {
             code: "INVALID_ORIGIN",
             message:
-              "The request origin is not allowed.",
+              "الطلب غير مسموح.",
           },
         },
         {
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
           error: {
             code: "RECENT_SIGN_IN_REQUIRED",
             message:
-              "A recent sign-in is required.",
+              "سجّل دخولك مجددًا للمتابعة.",
           },
         },
         {

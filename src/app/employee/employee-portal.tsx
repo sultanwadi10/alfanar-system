@@ -1,4 +1,5 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
 
 import {
   type FormEvent,
@@ -8,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import styles from "./employee.module.css";
+import StoreHome from "./store-home";
 
 type EmployeeOption = {
   id: string;
@@ -126,7 +128,7 @@ async function fetchOperatorState(): Promise<OperatorResult> {
       type: "ERROR",
 
       message:
-        "تعذر الاتصال بالخادم.",
+        "تعذّر الاتصال. حاول مجددًا.",
     };
   }
 }
@@ -179,7 +181,7 @@ async function fetchShiftState(): Promise<ShiftResult> {
       type: "ERROR",
 
       message:
-        "تعذر الاتصال بالخادم.",
+        "تعذّر الاتصال. حاول مجددًا.",
     };
   }
 }
@@ -231,26 +233,6 @@ function parsePriceToFils(
   }
 
   return result;
-}
-
-function formatShiftTime(
-  value: string,
-) {
-  return new Intl.DateTimeFormat(
-    "ar-JO",
-    {
-      timeZone:
-        "Asia/Amman",
-
-      hour:
-        "numeric",
-
-      minute:
-        "2-digit",
-    },
-  ).format(
-    new Date(value),
-  );
 }
 
 export default function EmployeePortal() {
@@ -344,6 +326,10 @@ export default function EmployeePortal() {
     useState(false);
 
   useEffect(() => {
+    if(operator?.employeeId)window.dispatchEvent(new CustomEvent("alfanar:operator-ready",{detail:operator.employeeId}));
+  },[operator?.employeeId]);
+
+  useEffect(() => {
     let cancelled =
       false;
 
@@ -371,7 +357,7 @@ export default function EmployeePortal() {
         "ERROR"
       ) {
         setErrorMessage(
-          operatorResult.message,
+          userMessage(operatorResult.message),
         );
 
         setStage(
@@ -496,7 +482,7 @@ export default function EmployeePortal() {
       "ERROR"
     ) {
       setErrorMessage(
-        result.message,
+        userMessage(result.message),
       );
     }
   }
@@ -559,7 +545,7 @@ export default function EmployeePortal() {
       !selectedEmployeeId
     ) {
       setErrorMessage(
-        "اختر اسم الموظف أولًا.",
+        userMessage("اختر اسم الموظف أولًا."),
       );
 
       return;
@@ -571,7 +557,7 @@ export default function EmployeePortal() {
       )
     ) {
       setErrorMessage(
-        "أدخل PIN من 4 إلى 6 أرقام.",
+        userMessage("أدخل PIN من 4 إلى 6 أرقام."),
       );
 
       return;
@@ -612,8 +598,8 @@ export default function EmployeePortal() {
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر تسجيل الدخول.",
+          userMessage(data?.error?.message ??
+          "تعذر تسجيل الدخول."),
         );
 
         setPin("");
@@ -632,7 +618,7 @@ export default function EmployeePortal() {
       });
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -666,8 +652,8 @@ export default function EmployeePortal() {
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر بدء الشفت.",
+          userMessage(data?.error?.message ??
+          "تعذر بدء الشفت."),
         );
 
         return;
@@ -682,7 +668,7 @@ export default function EmployeePortal() {
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -713,8 +699,8 @@ export default function EmployeePortal() {
           await response.json();
 
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر تبديل الموظف.",
+          userMessage(data?.error?.message ??
+          "تعذر تبديل الموظف."),
         );
 
         return;
@@ -726,7 +712,7 @@ export default function EmployeePortal() {
       await loadEmployeeSelection();
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -772,8 +758,8 @@ export default function EmployeePortal() {
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر تجهيز إنهاء الشفت.",
+          userMessage(data?.error?.message ??
+          "تعذر تجهيز إنهاء الشفت."),
         );
 
         return;
@@ -790,7 +776,7 @@ export default function EmployeePortal() {
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setCloseLoading(
@@ -804,6 +790,7 @@ export default function EmployeePortal() {
       FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+    if (closeLoading || !shift) return;
 
     const actualCashFils =
       parsePriceToFils(
@@ -815,7 +802,7 @@ export default function EmployeePortal() {
       null
     ) {
       setErrorMessage(
-        "أدخل مبلغ الكاش الموجود فعليًا بشكل صحيح.",
+        userMessage("أدخل مبلغ الكاش الموجود فعليًا بشكل صحيح."),
       );
 
       return;
@@ -823,7 +810,7 @@ export default function EmployeePortal() {
 
     if (!cashConfirmed) {
       setErrorMessage(
-        "أكد أن المبلغ المدخل هو الكاش الموجود فعليًا في الصندوق.",
+        userMessage("أكد أن المبلغ المدخل هو الكاش الموجود فعليًا في الصندوق."),
       );
 
       return;
@@ -851,6 +838,7 @@ export default function EmployeePortal() {
             body:
               JSON.stringify({
                 actualCashFils,
+                shiftId: shift.id,
               }),
           },
         );
@@ -863,8 +851,8 @@ export default function EmployeePortal() {
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر إنهاء الشفت.",
+          userMessage(data?.error?.message ??
+          "تعذر إنهاء الشفت."),
         );
 
         return;
@@ -903,7 +891,7 @@ export default function EmployeePortal() {
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setCloseLoading(
@@ -1046,12 +1034,7 @@ export default function EmployeePortal() {
               من يعمل الآن؟
             </h1>
 
-            <p>
-              اختر اسمك ثم أدخل
-              رمز PIN الخاص بك.
-              النظام سيتحقق من
-              جدول دوامك تلقائيًا.
-            </p>
+
           </div>
 
           <form
@@ -1318,12 +1301,7 @@ export default function EmployeePortal() {
             جاهز تبدأ دوامك؟
           </h1>
 
-          <p>
-            تم التحقق من هويتك
-            وجدول دوامك. ابدأ الشفت
-            حتى تتمكن من تسجيل
-            عمليات المحل.
-          </p>
+
 
           <div
             className={
@@ -1343,11 +1321,7 @@ export default function EmployeePortal() {
               </strong>
             </div>
 
-            <small>
-              سيتم ربط جميع
-              العمليات بهذا الشفت
-              وبهويتك.
-            </small>
+
           </div>
 
           {errorMessage && (
@@ -1433,12 +1407,7 @@ export default function EmployeePortal() {
           </h1>
 
           <p>
-            تم تسجيل مبلغ الكاش
-            الذي أدخلته وإغلاق
-            الشفت. ستقوم الإدارة
-            بمراجعة الجرد من لوحة
-            التحكم.
-          </p>
+            تم تسجيل التسليم وإغلاق الشفت.</p>
 
           <button
             type="button"
@@ -1463,240 +1432,15 @@ export default function EmployeePortal() {
     shift
   ) {
     return (
-      <main
-        className={
-          styles.storePage
-        }
-        dir="rtl"
+      <StoreHome
+        employeeName={operator.employeeName}
+        openedAt={shift.openedAt}
+        switching={loading}
+        closing={closeLoading}
+        error={errorMessage}
+        onSwitch={() => void switchEmployee()}
+        onClose={() => void openCloseShift()}
       >
-        <header
-          className={
-            styles.storeHeader
-          }
-        >
-          <div
-            className={
-              styles.storeBrand
-            }
-          >
-            <div
-              className={
-                styles.brandMarkSmall
-              }
-            >
-              ف
-            </div>
-
-            <div>
-              <strong>
-                محطة الفنار
-              </strong>
-
-              <span>
-                نظام تشغيل المحل
-              </span>
-            </div>
-          </div>
-
-          <div
-            className={
-              styles.headerActions
-            }
-          >
-            <div
-              className={
-                styles.operatorIdentity
-              }
-            >
-              <span
-                className={
-                  styles.operatorAvatar
-                }
-              >
-                {operator.employeeName
-                  .trim()
-                  .charAt(0)}
-              </span>
-
-              <div
-                className={
-                  styles.currentOperator
-                }
-              >
-                <span>
-                  الموظف الحالي
-                </span>
-
-                <strong>
-                  {
-                    operator.employeeName
-                  }
-                </strong>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className={
-                styles.switchButton
-              }
-              disabled={
-                loading
-              }
-              onClick={() =>
-                void switchEmployee()
-              }
-            >
-              تبديل الموظف
-            </button>
-          </div>
-        </header>
-
-        <section
-          className={
-            styles.homeContent
-          }
-        >
-          <div
-            className={
-              styles.shiftStrip
-            }
-          >
-            <div
-              className={
-                styles.shiftState
-              }
-            >
-              <span
-                className={
-                  styles.liveDot
-                }
-              />
-
-              <div>
-                <strong>
-                  الشفت مفتوح
-                </strong>
-
-                <small>
-                  بدأ الساعة{" "}
-                  {formatShiftTime(
-                    shift.openedAt,
-                  )}
-                </small>
-              </div>
-            </div>
-
-            <span
-              className={
-                styles.shiftSecurityText
-              }
-            >
-              جميع العمليات تسجل
-              باسم{" "}
-              {
-                operator.employeeName
-              }
-            </span>
-
-            <button
-              type="button"
-              className={
-                styles.endShiftButton
-              }
-              disabled={
-                closeLoading
-              }
-              onClick={() =>
-                void openCloseShift()
-              }
-            >
-              {closeLoading
-                ? "جاري التجهيز..."
-                : "إنهاء الشفت"}
-            </button>
-          </div>
-
-          <section
-            className={
-              styles.hero
-            }
-          >
-            <span>
-              أهلًا،{" "}
-              {
-                operator.employeeName
-              }
-            </span>
-
-            <h1>
-              شو بدك تعمل؟
-            </h1>
-
-            <p>
-              اختر العملية وابدأ
-              مباشرة. الواجهة مصممة
-              لتكون سريعة وواضحة
-              أثناء ضغط العمل.
-            </p>
-          </section>
-
-          {errorMessage && (
-            <div
-              className={
-                styles.homeError
-              }
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <section className={styles.operationGrid}>
-  <button type="button" className={styles.saleAction}
-    onClick={() => router.push("/employee/sale")}>
-    <span className={styles.actionIconPrimary}>+</span>
-    <div className={styles.actionContent}>
-      <span>عملية سريعة</span>
-      <strong>بيع مباشر</strong>
-      <small>البيع داخل المحل</small>
-    </div>
-    <span className={styles.actionArrow}>←</span>
-  </button>
-
-  <button type="button" className={styles.deliveryAction}
-    onClick={() => router.push("/employee/orders/new")}>
-    <span className={styles.actionIcon}>ت</span>
-    <div className={styles.actionContent}>
-      <span>تسجيل طلب</span>
-      <strong>طلب توصيل جديد</strong>
-      <small>اختر العميل والأصناف</small>
-    </div>
-    <span className={styles.actionArrow}>←</span>
-  </button>
-
-  <button type="button" className={styles.smallAction}
-    onClick={() => router.push("/employee/orders")}>
-    <span className={styles.smallActionIcon}>ط</span>
-    <div>
-      <span>التوصيل اليومي</span>
-      <strong>طلبات اليوم</strong>
-      <small>جديد، جاهز، تم التسليم</small>
-    </div>
-  </button>
-
-  <button type="button" className={styles.smallAction}
-    onClick={() => router.push("/employee/customers")}>
-    <span className={styles.smallActionIcon}>ع</span>
-    <div>
-      <span>قاعدة العملاء</span>
-      <strong>العملاء</strong>
-      <small>بحث وإضافة عميل</small>
-    </div>
-  </button>
-</section>
-
-          </section>
-
         {closeModalOpen && (
           <div
             className={
@@ -1725,25 +1469,12 @@ export default function EmployeePortal() {
                   في الصندوق
                 </h2>
 
-                <p>
-                  عدّ الكاش الموجود
-                  فعليًا ثم أدخل
-                  المبلغ كما هو.
-                  ستقوم الإدارة
-                  بالمطابقة والمراجعة.
-                </p>
+
               </div>
 
-              <div
-                className={
-                  styles.closeWarning
-                }
-              >
-                لن يعرض لك النظام
-                الكاش المتوقع أو
-                فرق الجرد.
-              </div>
 
+
+              {errorMessage && <p role="alert" className={styles.homeError}>{errorMessage}</p>}
               <form
                 onSubmit={
                   confirmCloseShift
@@ -1870,7 +1601,7 @@ export default function EmployeePortal() {
             </div>
           </div>
         )}
-      </main>
+      </StoreHome>
     );
   }
 

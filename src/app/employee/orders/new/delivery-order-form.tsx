@@ -1,6 +1,10 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { customerDeliveryUnitPrice } from "@/lib/customers/delivery-pricing";
+import { newRequestId } from "@/lib/client/request-id";
 
 import ActionModal from "@/components/ui/action-modal";
+import { CustomerBottleReminder } from "@/components/store/customer-bottle-reminder";
 
 import {
   type ReactNode,
@@ -16,6 +20,7 @@ import type { ProductCategory } from "@/types/product";
 import styles from "./delivery-order.module.css";
 
 type DeliveryProduct = {
+  bottleSizeMl?: number;
   id: string;
   name: string;
   category: ProductCategory;
@@ -45,6 +50,7 @@ type PaymentMethod = "CASH" | "CLICK" | "COUPON";
 
 type Props = {
   products: DeliveryProduct[];
+  mode?: "admin" | "employee";
 };
 
 type CustomerChoice = {
@@ -52,6 +58,7 @@ type CustomerChoice = {
   name: string;
   phone: string;
   primaryAddress: string;
+  specialDelivery20LPriceFils?: number | null;
 };
 
 function apiError(data: unknown, fallback: string): string {
@@ -299,9 +306,11 @@ function getPaymentLabel(method: PaymentMethod) {
 }
 
 export default function DeliveryOrderForm({
-  products,
+  products: initialProducts, mode="employee",
 }: Props) {
   const router = useRouter();
+  const customerEndpoint=mode==="admin"?"/api/admin/order-customers":"/api/operator/customers";
+  const orderEndpoint=mode==="admin"?"/api/admin/delivery-orders/create":"/api/operator/delivery-orders";
 
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] =
@@ -311,6 +320,7 @@ export default function DeliveryOrderForm({
   const [customerQuery, setCustomerQuery] = useState("");
   const [matches, setMatches] = useState<CustomerChoice[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerChoice | null>(null);
+  const products=useMemo(()=>initialProducts.map(product=>({...product,deliveryPriceFils:customerDeliveryUnitPrice(product,selectedCustomer??{}).unitPriceFils})),[initialProducts,selectedCustomer]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
@@ -319,12 +329,22 @@ export default function DeliveryOrderForm({
   const [savedOrder, setSavedOrder] = useState<{
     orderNumber: string;
     paymentState: string;
+    pendingCouponQuantity: number;
   } | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const prefilledRef = useRef(false);
 
   // Preselect only a public customer record from the protected operator API.
-  // Never fetch customer history or coupon details into the employee browser.
+  // Fetch only protected account totals for the employee, never its history.
+  const [account,setAccount]=useState<{id:string;moneyDueFils:number;couponsDue:number;availableCoupons:number;partial:boolean}|null>(null);
+  const [accountError,setAccountError]=useState("");
+  useEffect(()=>{
+    if(!selectedCustomer) return;
+    const id=selectedCustomer.id, controller=new AbortController();
+    const endpoint=mode==="admin" ? "/api/admin/customers/"+encodeURIComponent(id)+"/receivables" : "/api/operator/customer-account?customerId="+encodeURIComponent(id);
+    fetch(endpoint,{cache:"no-store",signal:controller.signal}).then(async response=>{const result=await response.json();if(!response.ok||!result.success) throw Error(result.error?.message??"تعذّر تحميل رصيد العميل.");if(!controller.signal.aborted){setAccount({...result.data,id});setAccountError("");}}).catch(error=>{if(!controller.signal.aborted){setAccountError(error instanceof Error?error.message:"تعذّر تحميل الرصيد.");setAccount(null);}});
+    return ()=>controller.abort();
+  },[selectedCustomer,mode]);
   useEffect(() => {
     if (prefilledRef.current) return;
     prefilledRef.current = true;
@@ -333,7 +353,7 @@ export default function DeliveryOrderForm({
     const controller = new AbortController();
     async function prefill() {
       try {
-        const response = await fetch(`/api/operator/customers?id=${encodeURIComponent(customerId!)}`, {
+        const response = await fetch(`${customerEndpoint}?id=${encodeURIComponent(customerId!)}`, {
           cache: "no-store", signal: controller.signal,
         });
         const data = await response.json();
@@ -347,12 +367,12 @@ export default function DeliveryOrderForm({
         setCustomerName(customer.name);
         setAddress(customer.primaryAddress);
       } catch {
-        if (!controller.signal.aborted) setCustomerError("تعذر اختيار العميل تلقائيًا. ابحث عنه بالاسم أو الهاتف.");
+        if (!controller.signal.aborted) setCustomerError(userMessage("تعذر اختيار العميل تلقائيًا. ابحث عنه بالاسم أو الهاتف."));
       }
     }
     void prefill();
     return () => controller.abort();
-  }, []);
+  }, [customerEndpoint]);
 
   useEffect(() => {
     if (selectedCustomer || customerQuery.trim().length < 2) {
@@ -363,7 +383,7 @@ export default function DeliveryOrderForm({
       setSearchingCustomers(true);
       try {
         const response = await fetch(
-          `/api/operator/customers?q=${encodeURIComponent(customerQuery.trim())}`,
+          `${customerEndpoint}?q=${encodeURIComponent(customerQuery.trim())}`,
           { signal: abortController.signal, cache: "no-store" },
         );
         const data = await response.json();
@@ -375,7 +395,7 @@ export default function DeliveryOrderForm({
       } catch (error) {
         if (!abortController.signal.aborted) {
           setMatches([]);
-          setCustomerError(error instanceof Error ? error.message : "تعذر البحث عن العملاء.");
+          setCustomerError(userMessage(error instanceof Error ? error.message : "تعذر البحث عن العملاء."));
         }
       } finally {
         if (!abortController.signal.aborted) setSearchingCustomers(false);
@@ -385,7 +405,7 @@ export default function DeliveryOrderForm({
       window.clearTimeout(timer);
       abortController.abort();
     };
-  }, [customerQuery, selectedCustomer]);
+  }, [customerQuery, selectedCustomer, customerEndpoint]);
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<
@@ -570,12 +590,12 @@ export default function DeliveryOrderForm({
   async function createNewCustomer() {
     setCustomerError("");
     if (!/^07\d{8}$/.test(phone) || customerName.trim().length < 2 || address.trim().length < 5) {
-      setCustomerError("أدخل رقم هاتف صحيحًا واسمًا وعنوانًا كاملين.");
+      setCustomerError(userMessage("أدخل رقم هاتف صحيحًا واسمًا وعنوانًا كاملين."));
       return;
     }
     setCreatingCustomer(true);
     try {
-      const response = await fetch("/api/operator/customers", {
+      const response = await fetch(customerEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: customerName.trim(), phone, primaryAddress: address.trim() }),
@@ -586,7 +606,7 @@ export default function DeliveryOrderForm({
       }
       chooseCustomer(data.data.customer);
     } catch (error) {
-      setCustomerError(error instanceof Error ? error.message : "تعذر إنشاء العميل.");
+      setCustomerError(userMessage(error instanceof Error ? error.message : "تعذر إنشاء العميل."));
     } finally {
       setCreatingCustomer(false);
     }
@@ -595,17 +615,18 @@ export default function DeliveryOrderForm({
   async function saveOrder() {
     setOrderError("");
     if (!selectedCustomer || !customerReady || itemCount === 0) {
-      setOrderError("اختر العميل، وأكمل العنوان، وأضف المنتجات أولًا.");
+      setOrderError(userMessage("اختر العميل، وأكمل العنوان، وأضف المنتجات أولًا."));
       return;
     }
     setSavingOrder(true);
     try {
-      if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
-      const response = await fetch("/api/operator/delivery-orders", {
+      if (!requestIdRef.current) requestIdRef.current = newRequestId();
+      const response = await fetch(orderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requestId: requestIdRef.current,
+          expectedTotalFils: productsTotalFils,
           customerId: selectedCustomer.id,
           address: address.trim(),
           notes: notes.trim(),
@@ -625,9 +646,10 @@ export default function DeliveryOrderForm({
       setSavedOrder({
         orderNumber: data.data.orderNumber,
         paymentState: data.data.paymentState,
+        pendingCouponQuantity: data.data.pendingCouponQuantity ?? 0,
       });
     } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "تعذر تسجيل الطلب.");
+      setOrderError(userMessage(error instanceof Error ? error.message : "تعذر تسجيل الطلب."));
     } finally {
       setSavingOrder(false);
     }
@@ -732,18 +754,16 @@ export default function DeliveryOrderForm({
           <small>تم تسجيل الطلب بنجاح</small>
           <h1>طلب اليوم #{savedOrder.orderNumber}</h1>
           <p>الطلب محفوظ في النظام بحالة «جديد».</p>
-          {savedOrder.paymentState === "AWAITING_BOOKLET_APPROVAL" && (
-            <p className={styles.successPending}>الدفع بالكوبونات بانتظار اعتماد الدفتر من الإدارة؛ لم تُضف أو تُخصم كوبونات بعد.</p>
-          )}
+          {savedOrder.pendingCouponQuantity>0 && <p>المتبقي للطلب: {savedOrder.pendingCouponQuantity} كوبون — أبلغ العميل قبل التوصيل.</p>}
           {savedOrder.paymentState === "COUPONS_RESERVED" && (
-            <p className={styles.successPending}>تم حجز كوبونات الطلب، ويُعتمد استهلاكها عند التسليم.</p>
+            null
           )}
           {newBookletRequested && (
-            <p className={styles.successPending}>طلب شراء الدفتر الجديد محفوظ للإدارة، ولم يُصدَر أو يُعتمد الدفتر بعد.</p>
+            null
           )}
           <div className={styles.successActions}>
             <button type="button" onClick={() => window.location.reload()}>تسجيل طلب آخر</button>
-            <button type="button" onClick={() => router.push("/employee/orders")}>عرض طلبات اليوم</button>
+            <button type="button" onClick={() => router.push(mode==="admin"?"/admin/orders":"/employee/orders")}>عرض طلبات اليوم</button>
           </div>
         </div>
       </main>
@@ -770,7 +790,7 @@ export default function DeliveryOrderForm({
           <button
             type="button"
             className={styles.backButton}
-            onClick={() => router.push("/employee")}
+            onClick={() => router.push(mode==="admin"?"/admin/orders":"/employee")}
           >
             <Icon name="arrow" size={17} />
             العودة للرئيسية
@@ -786,10 +806,7 @@ export default function DeliveryOrderForm({
 
             <h1>طلب توصيل جديد</h1>
 
-            <p>
-              من مكالمة الزبون إلى تفاصيل الطلب،
-              كل شيء في مكان واحد.
-            </p>
+
 
             <div className={styles.heroTags}>
               <span>
@@ -809,10 +826,8 @@ export default function DeliveryOrderForm({
             </div>
 
             <span>طلب جديد</span>
-            <strong>رقم يومي تلقائي</strong>
-            <small>
-              يتم إصدار الرقم تلقائيًا عند تسجيل الطلب
-            </small>
+            <strong>رقم الطلب</strong>
+
           </div>
         </header>
 
@@ -883,10 +898,7 @@ export default function DeliveryOrderForm({
                     الخطوة الأولى
                   </span>
                   <h2>معلومات العميل</h2>
-                  <p>
-                    خلّينا نبدأ برقم هاتف الزبون
-                    ومكان التوصيل.
-                  </p>
+
                 </div>
 
                 <span className={styles.sectionIndex}>
@@ -905,6 +917,9 @@ export default function DeliveryOrderForm({
                     <div>
                       <strong>{selectedCustomer.name}</strong>
                       <small>{selectedCustomer.primaryAddress || "لا يوجد عنوان محفوظ"}</small>
+                      {selectedCustomer.specialDelivery20LPriceFils!=null&&<small>تعبئة 20 لتر بالتوصيل: {formatMoney(selectedCustomer.specialDelivery20LPriceFils)} — سعر خاص</small>}
+                      <CustomerBottleReminder customerId={selectedCustomer.id} mode={mode}/>
+                      {account?.id===selectedCustomer.id && (account.moneyDueFils>0||account.couponsDue>0) && <p role="status">مستحقات سابقة: {formatMoney(account.moneyDueFils)} · {account.couponsDue} كوبون</p>}
                     </div>
                     <div className={styles.customerActions}>
                       <button type="button" onClick={() => goToSection("products-section")}>متابعة الطلب</button>
@@ -930,7 +945,7 @@ export default function DeliveryOrderForm({
                       <small>{searchingCustomers ? "بحث..." : ""}</small>
                     </div>
                     {customerQuery.trim().length >= 2 && !searchingCustomers && matches.length === 0 && !customerError && (
-                      <p className={styles.searchEmpty}>لا توجد نتائج مطابقة. يمكنك تسجيل عميل جديد أدناه.</p>
+                      <p className={styles.searchEmpty}>لا توجد نتائج مطابقة.</p>
                     )}
                     {matches.length > 0 && (
                       <div className={styles.customerResults}>
@@ -982,13 +997,7 @@ export default function DeliveryOrderForm({
                     />
                   </div>
 
-                  <small className={styles.fieldHint}>
-                    {phone.length === 0
-                      ? "أدخل رقم الزبون الأردني."
-                      : phoneValid
-                        ? "رقم الهاتف مكتمل مبدئيًا."
-                        : "أدخل رقمًا من 10 أرقام يبدأ بـ07."}
-                  </small>
+
                 </label>
 
                 <label className={styles.field}>
@@ -1016,9 +1025,7 @@ export default function DeliveryOrderForm({
                     />
                   </div>
 
-                  <small className={styles.fieldHint}>
-                    الاسم كما سيظهر في الطلب.
-                  </small>
+
                 </label>
 
                 <label
@@ -1045,10 +1052,7 @@ export default function DeliveryOrderForm({
                     />
                   </div>
 
-                  <small className={styles.fieldHint}>
-                    اكتب وصفًا يساعد على وصول الطلب
-                    بدون تأخير.
-                  </small>
+
                 </label>
               </div>
 
@@ -1056,7 +1060,7 @@ export default function DeliveryOrderForm({
                 <div className={styles.customerCreation}>
                   <div>
                     <strong>الزبون غير مسجل؟</strong>
-                    <p>أدخل الاسم ورقم الهاتف والعنوان أعلاه، ثم أضفه لقاعدة العملاء قبل تسجيل الطلب.</p>
+
                   </div>
                   <button type="button" disabled={creatingCustomer || !phoneValid || customerName.trim().length < 2 || address.trim().length < 5} onClick={createNewCustomer}>
                     <Icon name="plus" size={17} />
@@ -1067,7 +1071,7 @@ export default function DeliveryOrderForm({
               {customerError && <div className={styles.formError} role="alert">{customerError}</div>}
               <div className={styles.inlineNotice}>
                 <Icon name="shield" size={18} />
-                <p>واجهة الموظف تعرض فقط اسم العميل ورقم الاتصال وعنوانه. سجل الطلبات والدفاتر والكوبونات خاص بالإدارة.</p>
+
               </div>
             </section>
 
@@ -1085,10 +1089,7 @@ export default function DeliveryOrderForm({
                     الخطوة الثانية
                   </span>
                   <h2>المنتجات المطلوبة</h2>
-                  <p>
-                    اختَر الأصناف والكميات بأسعار
-                    التوصيل المحددة من الإدارة.
-                  </p>
+
                 </div>
 
                 <span className={styles.sectionIndex}>
@@ -1151,9 +1152,7 @@ export default function DeliveryOrderForm({
                   </span>
                   <strong>ما لقينا منتجات مطابقة</strong>
                   <p>
-                    جرّب اسمًا آخر أو اختَر تصنيفًا
-                    مختلفًا.
-                  </p>
+                    لا توجد أصناف مطابقة.</p>
                 </div>
               ) : (
                 <div className={styles.productsGrid}>
@@ -1359,10 +1358,7 @@ export default function DeliveryOrderForm({
                     الخطوة الثالثة
                   </span>
                   <h2>الدفع وتفاصيل الطلب</h2>
-                  <p>
-                    حدّد طريقة الدفع، ثم أضف أي
-                    تعليمات للتوصيل.
-                  </p>
+
                 </div>
 
                 <span className={styles.sectionIndex}>
@@ -1426,6 +1422,8 @@ export default function DeliveryOrderForm({
                 })}
               </div>
 
+              {paymentMethod === "COUPON" && selectedCustomer && account?.id===selectedCustomer.id && <p role="status">الكوبونات المتاحة: {account.availableCoupons}{itemCount>account.availableCoupons ? ` — ينقص الطلب ${itemCount-account.availableCoupons} كوبون. يمكن حفظه وإبلاغ العميل.` : ""}{account.partial?" — الرصيد المعروض جزئي":""}</p>}
+              {paymentMethod === "COUPON" && accountError && <p role="status">{accountError} يمكن حفظ الطلب والتحقق من النقص عند الحفظ.</p>}
               {paymentMethod === "COUPON" && (
                 <div className={styles.couponInfo}>
                   <span className={styles.couponInfoIcon}>
@@ -1439,13 +1437,7 @@ export default function DeliveryOrderForm({
                     <strong>
                       الدفع باستخدام الكوبونات
                     </strong>
-                    <p>
-                      كل كوبون مقابل قارورة مياه
-                      واحدة. التحقق من توفر التغطية
-                      سيتم على السيرفر، بدون إظهار
-                      أرصدة الدفاتر أو أرقامها
-                      للموظف.
-                    </p>
+
                   </div>
                 </div>
               )}
@@ -1455,9 +1447,7 @@ export default function DeliveryOrderForm({
                   <span className={styles.subsectionLabel}>
                     دفتر كوبونات جديد
                   </span>
-                  <p>
-                    خدمة إضافية بناءً على طلب الزبون
-                  </p>
+
                 </div>
 
                 <span className={styles.bookletHint}>
@@ -1487,12 +1477,7 @@ export default function DeliveryOrderForm({
                   <strong>
                     الزبون يريد شراء دفتر جديد
                   </strong>
-                  <small>
-                    22 كوبونًا لكل دفتر. الموظف
-                    يبلغ الإدارة بطلب الشراء،
-                    والأدمن يعتمد الدفتر لاحقًا
-                    بعد تأكيد بيعه وتسليمه.
-                  </small>
+
                 </span>
 
                 <span
@@ -1549,11 +1534,7 @@ export default function DeliveryOrderForm({
 
             <div className={styles.bottomAssurance}>
               <Icon name="shield" size={19} />
-              <p>
-                تفاصيل الدفاتر وأرقامها وسجل
-                استهلاك الكوبونات تبقى خاصة
-                بالإدارة فقط.
-              </p>
+
             </div>
           </div>
 
@@ -1619,10 +1600,7 @@ export default function DeliveryOrderForm({
 
                   <strong>السلة لسه فارغة</strong>
 
-                  <p>
-                    أضف أول منتج من القائمة
-                    ليظهر هون.
-                  </p>
+
                 </div>
               ) : (
                 <div className={styles.cartItems}>
@@ -1693,9 +1671,7 @@ export default function DeliveryOrderForm({
                     <strong>
                       طلب دفتر كوبونات جديد
                     </strong>
-                    <small>
-                      سيتم حفظ طلب شراء الدفتر للإدارة، ولن يصدر دفتر أو رصيد قبل تأكيد البيع واعتماده.
-                    </small>
+
                   </div>
                 </div>
               )}
@@ -1708,12 +1684,7 @@ export default function DeliveryOrderForm({
                 </strong>
               </div>
 
-              <p className={styles.totalNote}>
-                إجمالي مبدئي قبل تسوية
-                الكوبونات أو احتساب ثمن
-                دفتر جديد. المبلغ النهائي
-                سيُحسب على السيرفر.
-              </p>
+
 
               {orderError && (
                 <div className={styles.formError} role="alert">{orderError}</div>
@@ -1747,7 +1718,7 @@ export default function DeliveryOrderForm({
       <ActionModal
         open={confirmClearCart}
         title="تفريغ المنتجات من الطلب"
-        description="سيتم حذف جميع المنتجات والكميات المختارة حاليًا. لن يتم حذف بيانات العميل أو أي طلب محفوظ مسبقًا."
+        description="سيتم تفريغ المنتجات والكميات المختارة."
         tone="warning"
         confirmLabel="نعم، تفريغ المنتجات"
         onClose={() => setConfirmClearCart(false)}

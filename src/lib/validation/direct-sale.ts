@@ -8,6 +8,7 @@ export const DIRECT_SALE_PAYMENT_METHODS =
 
 export const createDirectSaleSchema =
   z.object({
+    requestId: z.string().uuid(),
     paymentMethod:
       z.enum([
         DIRECT_SALE_PAYMENT_METHODS.CASH,
@@ -21,7 +22,8 @@ export const createDirectSaleSchema =
             .string()
             .trim()
             .min(1)
-            .max(128),
+            .max(128)
+            .regex(/^[A-Za-z0-9_-]{1,128}$/),
 
           quantity: z
             .number()

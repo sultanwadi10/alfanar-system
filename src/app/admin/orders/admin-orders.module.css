@@ -241,3 +241,21 @@
 :global(html[data-theme="dark"]) .cancelButton {color:#ffb0b0;background:#512f36;border-color:#79424a}
 :global(html[data-theme="dark"]) .success {color:#8ae8bc;background:#194a3c;border-color:#276b51}
 :global(html[data-theme="dark"]) .checkboxField {color:var(--ink)}
+
+/* Responsive viewport containment. */
+
+.modalBackdrop { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.modalBackdrop { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.modal { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.modal > * { min-width: 0; }
+@media (max-width: 600px) { .modal { padding: 18px 14px; border-radius: 16px; } }
+
+
+.historyStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.searchControls { display: flex; align-items: stretch; gap: 10px; min-width: 0; }
+.searchControls input { flex: 1; min-width: 0; }
+.searchControls button { min-height: 45px; padding: 10px 22px; border: 0; border-radius: 12px; color: #fff; background: var(--blue); font: inherit; font-weight: 750; }
+.searchControls button:disabled { opacity: .5; cursor: not-allowed; }
+.statCard .cancelledNumber { color: #bd3f4e; }
+:global(html[data-theme="dark"]) .statCard .cancelledNumber { color: #ffabb5; }
+@media(max-width:600px) { .historyStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .historyStats > :first-child { grid-column: 1 / -1; } .searchControls button { padding-inline: 16px; } }

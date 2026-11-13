@@ -70,7 +70,15 @@
 @media (max-width: 480px) {
   .overlay { padding: 12px; align-items: end; }
   .panel { border-radius: 18px; padding: 18px; width: 100%; }
-  .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .actions button { padding: 0 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .overlay { backdrop-filter: none; } }
+
+/* Responsive viewport containment. */
+
+.overlay { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.overlay { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.panel { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.panel > * { min-width: 0; }
+@media (max-width: 600px) { .panel { padding: 18px 14px; border-radius: 16px; } }

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { DeliveryOrderBusinessError } from "@/lib/orders/delivery-order-repository";
 import { listAdminOrders } from "@/lib/orders/admin-delivery-orders";
+import { usefulOrderSearch } from "@/lib/orders/order-search";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
 import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
@@ -13,7 +14,7 @@ const querySchema = z.object({
   view: z.enum(["today", "date", "recent", "search"]).default("today"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   cursor: z.string().regex(/^\d{8}-\d{3,8}$/).optional(),
-  q: z.string().trim().min(2).max(100).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
 });
 
 function fail(message: string, code: string, status: number) {
@@ -42,14 +43,15 @@ export async function GET(request: Request) {
         return fail("اختر تاريخًا صحيحًا.", "INVALID_DATE", 400);
       }
     }
-    if (view === "search" && !q) {
-      return fail("اكتب اسم عميل أو رقم هاتف كاملًا أو معرف طلب كاملًا.", "INVALID_QUERY", 400);
+    if (view === "search" && (!q || !usefulOrderSearch(q))) {
+      return fail("اكتب اسم العميل أو رقم الهاتف أو رقم الطلب.", "INVALID_QUERY", 400);
     }
     const data = await listAdminOrders({
       view,
       day: date?.replaceAll("-", ""),
       cursor,
       query: q,
+      fresh: params.get("refresh") === "1",
     });
     return NextResponse.json({ success: true, data }, {
       headers: { "Cache-Control": "private, no-store" },

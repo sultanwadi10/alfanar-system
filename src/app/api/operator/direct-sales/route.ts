@@ -1,3 +1,5 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
+import { InventoryError } from "@/lib/inventory/stock-engine";
 import { NextResponse } from "next/server";
 
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
@@ -12,7 +14,7 @@ import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { createDirectSaleSchema } from "@/lib/validation/direct-sale";
 
-export async function POST(
+async function handlePOST(
   request: Request,
 ) {
   try {
@@ -118,6 +120,7 @@ export async function POST(
 
     const result =
       await createDirectSale({
+        requestId: parsed.data.requestId,
         storeAuthUid:
           storeContext.authUid,
 
@@ -157,6 +160,7 @@ export async function POST(
       },
     );
   } catch (error) {
+    if (error instanceof InventoryError) return NextResponse.json({ success: false, error: { code: error.code, message: error.message } }, { status: 409, headers: { "Cache-Control": "no-store" } });
     if (
       error instanceof
       NoActiveShiftError
@@ -234,3 +238,4 @@ export async function POST(
     );
   }
 }
+export const POST = withOperationChanges(handlePOST, ["inventory","home"]);

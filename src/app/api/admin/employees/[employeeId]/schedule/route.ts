@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
 import {
@@ -19,7 +20,7 @@ type RouteContext = {
 };
 
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   context: RouteContext,
 ) {
@@ -179,3 +180,5 @@ export async function PATCH(
     );
   }
 }
+
+export const PATCH = withOperationChanges(handlePATCH, ["access","home"]);

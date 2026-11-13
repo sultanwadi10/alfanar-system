@@ -11,6 +11,8 @@ export type ProductCategory =
   (typeof PRODUCT_CATEGORIES)[keyof typeof PRODUCT_CATEGORIES];
 
 export type Product = {
+  bottleSizeMl?: number;
+  deliveryEnabled?: boolean;
   id: string;
 
   name: string;

@@ -252,7 +252,7 @@
   }
 
   .securityInfo {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stopButton,
@@ -587,7 +587,7 @@
 
   .deviceActions {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pairButton,
@@ -596,7 +596,7 @@
   }
 
   .pairingCodePanel {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pairingTimer {

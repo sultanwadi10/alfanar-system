@@ -1,3 +1,8 @@
+import { openOrderReceivable } from "@/lib/receivables/records";
+import { customerSearchDirectory } from "./customer-search-directory";
+import { normalizeOrderSearch, orderNameMatches, usefulOrderSearch } from "./order-search";
+import { prepareInventoryTransition, bottleRequirements } from "@/lib/inventory/stock-engine";
+import type { InventoryPlan, BottleReturn } from "@/types/inventory";
 import "server-only";
 
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -27,6 +32,9 @@ type HistoryEvent = {
 };
 
 type StoredOrder = {
+  inventoryPlan?: InventoryPlan | null;
+  bottleReturns?: BottleReturn[];
+  previousBottleReturns?: Array<BottleReturn & { label: string }>;
   storeAuthUid: string;
   shiftId?: string;
   orderDateKey: string;
@@ -73,6 +81,10 @@ function iso(value: unknown): string | null {
 function toDto(id: string, order: StoredOrder) {
   return {
     id,
+    inventoryTracked: !!order.inventoryPlan,
+    returnRequirements: bottleRequirements(order.inventoryPlan),
+    bottleReturns: order.bottleReturns ?? [],
+    previousBottleReturns: (order.previousBottleReturns ?? []).map(r => ({ itemId: r.itemId, quantity: r.quantity, label: r.label })),
     number: order.orderNumber ?? id,
     day: order.orderDateKey ?? "",
     status: order.status ?? "NEW",
@@ -138,6 +150,7 @@ export async function listAdminOrders(input: {
   day?: string;
   cursor?: string;
   query?: string;
+  fresh?: boolean;
 }) {
   const db = getFirebaseAdminFirestore();
   const orders = db.collection(ORDERS);
@@ -145,11 +158,13 @@ export async function listAdminOrders(input: {
   if (input.view === "today" || input.view === "date") {
     const day = input.view === "today" ? jordanDayKey() : input.day!;
     // Single-field query intentionally avoids deployment-time composite indexes.
-    const snapshot = await orders.where("orderDateKey", "==", day).limit(DAY_LIMIT).get();
+    const base = orders.where("orderDateKey", "==", day);
+    const [snapshot, summary] = await Promise.all([base.limit(DAY_LIMIT + 1).get(), input.view === "date" ? Promise.all([base.count().get(), base.where("status", "==", "DELIVERED").count().get(), base.where("status", "==", "CANCELLED").count().get()]).then(([all, delivered, cancelled]) => ({ all: all.data().count, delivered: delivered.data().count, cancelled: cancelled.data().count })) : Promise.resolve(null)]);
     return {
-      orders: sortRecent(snapshot.docs.map((doc) => toDto(doc.id, doc.data() as StoredOrder))),
+      summary,
+      orders: sortRecent(snapshot.docs.slice(0, DAY_LIMIT).map((doc) => toDto(doc.id, doc.data() as StoredOrder))),
       day,
-      limitReached: snapshot.size === DAY_LIMIT,
+      limitReached: snapshot.size > DAY_LIMIT,
       hasMore: false,
       nextCursor: null as string | null,
     };
@@ -175,40 +190,54 @@ export async function listAdminOrders(input: {
     };
   }
 
-  const raw = (input.query ?? "").trim();
-  const normalizedPhone = normalizeJordanPhone(raw);
-  const exactOrderId = /^\d{8}-\d{3,8}$/.test(raw);
-  let results: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-  let exact: AdminOrder[] = [];
-
-  if (exactOrderId) {
-    const doc = await orders.doc(raw).get();
-    if (doc.exists) exact = [toDto(doc.id, doc.data() as StoredOrder)];
-  } else if (normalizedPhone) {
-    const snapshot = await orders.where("customerPhoneSnapshot", "==", normalizedPhone)
-      .limit(SEARCH_LIMIT).get();
-    results = snapshot.docs;
-  } else {
-    // Name prefix search. For contains/partial-number search, use a dated view.
-    const snapshot = await orders.orderBy("customerNameSnapshot")
-      .startAt(raw).endAt(`${raw}\uf8ff`).limit(SEARCH_LIMIT).get();
-    results = snapshot.docs;
-  }
-
-  return {
-    orders: sortRecent(exact.length ? exact : results.map((doc) => toDto(doc.id, doc.data() as StoredOrder))),
-    day: null as string | null,
-    limitReached: results.length === SEARCH_LIMIT,
-    hasMore: false,
-    nextCursor: null as string | null,
+  const raw = (input.query ?? "").trim().replace(/^#\s*/, "");
+  if (!usefulOrderSearch(raw)) throw new DeliveryOrderBusinessError("INVALID_QUERY", "اكتب اسم العميل أو رقم الهاتف أو رقم الطلب.");
+  const normalized = normalizeOrderSearch(raw).replace(/^#\s*/, ""), phone = normalizeJordanPhone(normalized);
+  const explicitNumber = (input.query ?? "").trim().startsWith("#") && /^\d{1,8}$/.test(normalized);
+  const found = new Map<string, AdminOrder>();
+  let partial = false;
+  const add = (snapshot: FirebaseFirestore.QuerySnapshot) => {
+    if (snapshot.size > SEARCH_LIMIT) partial = true;
+    for (const doc of snapshot.docs.slice(0, SEARCH_LIMIT)) found.set(doc.id, toDto(doc.id, doc.data() as StoredOrder));
   };
+  if (/^\d{8}-\d{3,8}$/.test(normalized)) {
+    const doc = await orders.doc(normalized).get();
+    if (doc.exists) found.set(doc.id, toDto(doc.id, doc.data() as StoredOrder));
+  } else if (/^\d{1,8}$/.test(normalized) && (normalized.length < 4 || explicitNumber)) {
+    const variants = [...new Set([normalized, String(Number(normalized)), String(Number(normalized)).padStart(3, "0")])];
+    add(await orders.where("orderNumber", "in", variants).limit(SEARCH_LIMIT + 1).get());
+  } else if (phone) {
+    add(await orders.where("customerPhoneSnapshot", "==", phone).limit(SEARCH_LIMIT + 1).get());
+  } else {
+    const directory = await customerSearchDirectory(input.fresh);
+    const digits = normalized.replace(/\D/g, ""), isPhonePart = /^[+\d ()-]+$/.test(normalized) && digits.length >= 4;
+    const phoneDigits = digits.startsWith("00962") ? digits.slice(2) : digits.startsWith("07") ? digits.slice(1) : digits;
+    const matching = directory.rows.filter(customer => isPhonePart ? customer.phone.replace(/\D/g, "").includes(phoneDigits) : orderNameMatches(customer.name, normalized));
+    partial = directory.partial || matching.length > 30;
+    const ids = matching.slice(0, 30).map(customer => customer.id);
+    const batches: Promise<FirebaseFirestore.QuerySnapshot>[] = [];
+    for (let offset = 0; offset < ids.length; offset += 10) batches.push(orders.where("customerId", "in", ids.slice(offset, offset + 10)).limit(SEARCH_LIMIT + 1).get());
+    (await Promise.all(batches)).forEach(add);
+    // Retain lookup of historical snapshots if a customer was renamed/deleted.
+    if (!matching.length && !isPhonePart) {
+      const words = raw.replace(/\s+/g, " ").trim();
+      const variants = [...new Set([words, words.toLowerCase(), words.toUpperCase(), words.toLowerCase().replace(/(^|\s)\p{L}/gu, value => value.toUpperCase())])].slice(0, 4);
+      const snapshots = await Promise.all(variants.map(prefix => orders.orderBy("customerNameSnapshot").startAt(prefix).endAt(prefix + "\uf8ff").limit(SEARCH_LIMIT + 1).get()));
+      snapshots.forEach(add);
+    }
+    // Four or more digits can also be a daily order number.
+    if (/^\d{4,8}$/.test(normalized)) add(await orders.where("orderNumber", "in", [...new Set([normalized, String(Number(normalized)), String(Number(normalized)).padStart(3, "0")])]).limit(SEARCH_LIMIT + 1).get());
+  }
+  const sorted = sortRecent([...found.values()]);
+  return { orders: sorted.slice(0, SEARCH_LIMIT), day: null as string | null, summary: null, limitReached: partial || sorted.length > SEARCH_LIMIT, hasMore: false, nextCursor: null as string | null };
+
 }
 
 export async function changeAdminDeliveryOrderStatus(
   orderId: string,
   action: "DELIVERED" | "CANCELLED",
   adminUid: string,
-  input: { paymentCollected: boolean; reason: string },
+  input: { paymentDeferred?: boolean; paymentCollected: boolean; reason: string; bottleReturns?: BottleReturn[] },
 ) {
   const db = getFirebaseAdminFirestore();
   const orderRef = db.collection(ORDERS).doc(orderId);
@@ -233,6 +262,9 @@ export async function changeAdminDeliveryOrderStatus(
       throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "طريقة دفع الطلب غير معروفة. راجع البيانات قبل الاعتماد.");
     }
 
+    if (action === "DELIVERED" && input.paymentCollected && input.paymentDeferred) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "اختر حالة تحصيل واحدة.");
+    if (action === "DELIVERED" && (!Number.isSafeInteger(order.totalFils) || order.totalFils < 0)) throw new DeliveryOrderBusinessError("INVALID_AMOUNT", "قيمة الطلب غير صالحة.");
+    if (input.paymentDeferred && (action !== "DELIVERED" || order.paymentMethod === "COUPON")) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
     const allocations = order.couponAllocations ?? [];
     const neededBooklets = action === "CANCELLED" || (action === "DELIVERED" && order.paymentMethod === "COUPON");
     const bookletDocs = neededBooklets
@@ -240,8 +272,8 @@ export async function changeAdminDeliveryOrderStatus(
       : [];
 
     let shiftRef: FirebaseFirestore.DocumentReference | null = null;
-    if (action === "DELIVERED" && order.paymentMethod !== "COUPON") {
-      if (!input.paymentCollected) {
+    if (action === "DELIVERED" && order.paymentMethod !== "COUPON" && !input.paymentDeferred) {
+      if ((!input.paymentCollected && !input.paymentDeferred) || (input.paymentCollected && input.paymentDeferred)) {
         throw new DeliveryOrderBusinessError("PAYMENT_REQUIRED", "يجب تأكيد تسلّم قيمة الطلب قبل تسجيل التسليم.");
       }
       if (!order.shiftId || !order.storeAuthUid) {
@@ -281,6 +313,8 @@ export async function changeAdminDeliveryOrderStatus(
       }
     }
 
+    const inventory = await prepareInventoryTransition(tx, db, order.inventoryPlan, order.status, action, input.bottleReturns, { operationId: `order:${orderId}:${action}`, actor: { id: adminUid, name: "الإدارة", type: "ADMIN" }, customerId: order.customerId, customerName: order.customerNameSnapshot, orderId });
+    inventory.commit();
     // ALL reads completed before any writes. Transaction retry safely prevents
     // double settlement if an employee or another admin clicks simultaneously.
     const now = Timestamp.now();
@@ -313,6 +347,8 @@ export async function changeAdminDeliveryOrderStatus(
       }
     } else {
       patch.deliveredAt = now;
+      patch.bottleReturns = input.bottleReturns ?? [];
+      patch.previousBottleReturns = inventory.previousReturns;
       patch.deliveredByAdminUid = adminUid;
       patch.deliveredByAdminName = "الإدارة";
 
@@ -334,8 +370,12 @@ export async function changeAdminDeliveryOrderStatus(
             createdAt: now,
           });
         }
+        if ((order.pendingCouponQuantity ?? 0) > 0) openOrderReceivable(tx, db, orderId, order, now, "COUPON", order.pendingCouponQuantity!);
         patch.paymentState = (order.pendingCouponQuantity ?? 0) > 0
           ? "AWAITING_BOOKLET_APPROVAL" : "COUPONS_SETTLED";
+      } else if (input.paymentDeferred && order.totalFils > 0) {
+        patch.paymentState = "PAYMENT_DUE"; patch.collectedFils = 0; patch.collectionMode = "RECEIPTS";
+        openOrderReceivable(tx, db, orderId, order, now, "MONEY", order.totalFils);
       } else {
         patch.paymentState = "COLLECTED";
         patch.collectedAt = now;

@@ -6,7 +6,8 @@ export const operatorLoginSchema =
       .string()
       .trim()
       .min(1)
-      .max(128),
+      .max(128)
+      .regex(/^[A-Za-z0-9_-]{1,128}$/),
 
     pin: z
       .string()

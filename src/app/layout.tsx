@@ -78,6 +78,7 @@ export const viewport: Viewport = {
   width:
     "device-width",
   initialScale: 1,
+  interactiveWidget: "resizes-content",
   viewportFit:
     "cover",
   themeColor:
@@ -92,6 +93,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <body>

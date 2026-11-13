@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
 import { updateEmployeeActiveStatus } from "@/lib/employees/employee-repository";
@@ -13,7 +14,7 @@ type RouteContext = {
   }>;
 };
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   context: RouteContext,
 ) {
@@ -31,7 +32,7 @@ export async function PATCH(
           error: {
             code: "INVALID_ORIGIN",
             message:
-              "The request origin is not allowed.",
+              "الطلب غير مسموح.",
           },
         },
         {
@@ -58,7 +59,7 @@ export async function PATCH(
             code:
               "INVALID_EMPLOYEE_STATUS",
             message:
-              "Employee status is invalid.",
+              "حالة الموظف غير صالحة.",
           },
         },
         {
@@ -80,7 +81,7 @@ export async function PATCH(
           error: {
             code: "EMPLOYEE_NOT_FOUND",
             message:
-              "Employee was not found.",
+              "الموظف غير موجود.",
           },
         },
         {
@@ -109,7 +110,7 @@ export async function PATCH(
           code:
             "EMPLOYEE_STATUS_UPDATE_FAILED",
           message:
-            "Employee status could not be updated.",
+            "تعذّر تحديث حالة الموظف.",
         },
       },
       {
@@ -118,3 +119,5 @@ export async function PATCH(
     );
   }
 }
+
+export const PATCH = withOperationChanges(handlePATCH, ["access","home"]);

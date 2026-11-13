@@ -125,7 +125,7 @@ function createUnavailableResponse() {
             "SERVICE_UNAVAILABLE",
 
           message:
-            "Service is temporarily unavailable.",
+            "الخدمة غير متاحة حاليًا. حاول مجددًا.",
         },
       },
       {
@@ -162,7 +162,7 @@ export async function POST(
               "INVALID_ORIGIN",
 
             message:
-              "The request origin is not allowed.",
+              "الطلب غير مسموح.",
           },
         },
         {
@@ -235,7 +235,7 @@ export async function POST(
               "RECENT_SIGN_IN_REQUIRED",
 
             message:
-              "A recent sign-in is required.",
+              "سجّل دخولك مجددًا للمتابعة.",
           },
         },
         {
@@ -351,7 +351,7 @@ export async function POST(
             "AUTHENTICATION_FAILED",
 
           message:
-            "The store session could not be created.",
+            "تعذّر تسجيل الدخول إلى المحل. حاول مجددًا.",
         },
       },
       {

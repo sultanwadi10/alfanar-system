@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -10,7 +11,7 @@ import { toSecurityResponse } from "@/lib/security/to-security-response";
 
 export const dynamic = "force-dynamic";
 const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("ADD"), serial: z.string().trim().min(4).max(40) }).strict(),
+  z.object({ action: z.literal("ADD"), serial: z.string().trim().min(1).max(40) }).strict(),
   z.object({ action: z.literal("PRICE"), priceFils: z.number().int().min(1).max(1_000_000) }).strict(),
 ]);
 function fail(message: string, code: string, status: number) {
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
     return fail("تعذر تحميل لوحة الدفاتر.", "INTERNAL_ERROR", 500);
   }
 }
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const admin = await getAdminSecurityContext();
     if (!hasValidOrigin(request)) return fail("الطلب غير مسموح.", "FORBIDDEN", 403);
@@ -52,3 +53,5 @@ export async function POST(request: Request) {
     return fail("تعذر تنفيذ العملية.", "INTERNAL_ERROR", 500);
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home","catalog"]);

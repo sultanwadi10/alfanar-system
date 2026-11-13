@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
 import { hasValidOrigin } from "@/lib/security/has-valid-origin";
@@ -6,7 +7,7 @@ import { toSecurityResponse } from "@/lib/security/to-security-response";
 
 // The unnumbered legacy wallet is retired. Keep records read-only; all NEW
 // coupons must originate from a physical serial-numbered booklet.
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     await getAdminSecurityContext();
     if (!hasValidOrigin(request)) {
@@ -22,3 +23,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: "تعذر تنفيذ الطلب." } }, { status: 500 });
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home","catalog"]);

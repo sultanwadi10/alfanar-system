@@ -1,16 +1,19 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 type LogoutTarget = "admin" | "store";
 
 type LogoutButtonProps = {
   target: LogoutTarget;
+  label?: ReactNode;
+  className?: string;
 };
 
 export function LogoutButton({
-  target,
+  target, label, className,
 }: LogoutButtonProps) {
   const router = useRouter();
 
@@ -35,7 +38,7 @@ export function LogoutButton({
 
       if (!response.ok || data.success !== true) {
         setErrorMessage(
-          data?.error?.message ?? "Logout failed.",
+          userMessage(data?.error?.message ?? "Logout failed."),
         );
 
         return;
@@ -50,9 +53,9 @@ router.replace("/login");
 router.refresh();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
+        userMessage(error instanceof Error
           ? error.message
-          : "Unexpected logout error.",
+          : "Unexpected logout error."),
       );
     } finally {
       setLoading(false);
@@ -63,10 +66,11 @@ router.refresh();
     <div>
       <button
         type="button"
+        className={className}
         onClick={handleLogout}
         disabled={loading}
       >
-        {loading ? "Signing out..." : "Logout"}
+        {loading ? (label ? "جارٍ الخروج…" : "Signing out...") : label ?? "Logout"}
       </button>
 
       {errorMessage && (

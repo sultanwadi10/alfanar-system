@@ -1,6 +1,8 @@
+import { resolveOperatorSession } from "@/lib/auth/operator-session";
 import type {
   ReactNode,
 } from "react";
+import { StoreTheme } from "./store-theme";
 import {
   redirect,
 } from "next/navigation";
@@ -54,8 +56,10 @@ export default async function EmployeeLayout({
     redirect("/");
   }
 
+  let initialOperatorEmployeeId:string|null=null;
   try {
-    await getStoreSecurityContext();
+    const context=await getStoreSecurityContext();
+    initialOperatorEmployeeId=(await resolveOperatorSession(context.authUid,{handoverOnly:true}))?.employeeId??null;
   } catch (error) {
     if (
       isSecurityError(
@@ -71,8 +75,8 @@ export default async function EmployeeLayout({
   }
 
   return (
-    <StoreRuntimeWatch>
-      {children}
+    <StoreRuntimeWatch initialOperatorEmployeeId={initialOperatorEmployeeId}>
+      <StoreTheme>{children}</StoreTheme>
     </StoreRuntimeWatch>
   );
 }

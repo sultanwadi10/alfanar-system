@@ -11,7 +11,7 @@ function creator(customer: Customer) {
   return "الإدارة";
 }
 function archiveDate(customer: Customer) {
-  return customer.archivedAt ? new Intl.DateTimeFormat("ar-JO", {
+  return customer.archivedAt ? new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Amman", dateStyle: "medium",
   }).format(customer.archivedAt) : null;
 }

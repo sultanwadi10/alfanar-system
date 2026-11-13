@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
@@ -8,7 +9,7 @@ import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { closeShift } from "@/lib/shifts/shift-repository";
 import { closeShiftSchema } from "@/lib/validation/shift";
 
-export async function POST(
+async function handlePOST(
   request: Request,
 ) {
   try {
@@ -41,6 +42,7 @@ export async function POST(
     const operator =
       await resolveOperatorSession(
         storeContext.authUid,
+        { handoverOnly: true },
       );
 
     if (!operator) {
@@ -127,6 +129,7 @@ export async function POST(
      */
     const result =
       await closeShift({
+        shiftId: parsed.data.shiftId,
         storeAuthUid:
           storeContext.authUid,
 
@@ -201,3 +204,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["access","home"]);

@@ -9,6 +9,7 @@ export type Employee = {
 };
 
 export type EmployeeRecord = {
+  authVersion?: number;
   name: string;
   isActive: boolean;
   pinHash: string;

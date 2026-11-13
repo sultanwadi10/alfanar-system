@@ -1,3 +1,5 @@
+import { invalidateCustomerSearchDirectory } from "@/lib/orders/customer-search-directory";
+import { customerSpecialDeliveryPrice } from "./delivery-pricing";
 import "server-only";
 
 import { createHash } from "crypto";
@@ -81,6 +83,7 @@ function toCustomer(
 ): Customer {
   return {
     id,
+    specialDelivery20LPriceFils: customerSpecialDeliveryPrice(record),
 
     name: record.name,
 
@@ -274,6 +277,7 @@ export async function createCustomerRecord(
     },
   );
 
+  invalidateCustomerSearchDirectory();
   return toCustomer(
     customerRef.id,
     customerRecord,
@@ -355,6 +359,7 @@ export async function getCustomerById(
 }
 
 type UpdateCustomerRecordInput = {
+  specialDelivery20LPriceFils?: number | null;
   name: string;
 
   phoneNormalized: string;
@@ -463,6 +468,7 @@ export async function updateCustomerRecord(
       const updatedRecord: CustomerRecord =
         {
           ...existing,
+          ...(input.specialDelivery20LPriceFils!==undefined?{specialDelivery20LPriceFils:customerSpecialDeliveryPrice(input)}:{}),
 
           name: input.name,
 
@@ -484,6 +490,7 @@ export async function updateCustomerRecord(
       transaction.update(
         customerRef,
         {
+          ...(input.specialDelivery20LPriceFils!==undefined?{specialDelivery20LPriceFils:updatedRecord.specialDelivery20LPriceFils}:{}),
           name:
             updatedRecord.name,
 
@@ -509,7 +516,7 @@ export async function updateCustomerRecord(
         updatedRecord,
       );
     },
-  );
+  ).then(result => { invalidateCustomerSearchDirectory(); return result; });
 }
 
 export async function archiveCustomerRecord(

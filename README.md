@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# نظام محطة الفنار
 
-## Getting Started
+نظام عربي لإدارة المحل والتوصيل والمخزون والدفاتر والموظفين والتقارير. يشمل لوحة الإدارة وصفحات الموظف، ويدعم الوضعين الفاتح والداكن والشاشات الصغيرة.
 
-First, run the development server:
+## نسخة المراجعة
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+الفرع `review/pre-handoff-2026-11-13` يحفظ التعديلات للمراجعة قبل التسليم. عُطّل النشر التلقائي لهذا الفرع تحديدًا في `vercel.json`. رفع الكود لا ينظف بيانات Firebase ولا ينفذ أدوات التصفير.
+
+دليل المراجعة: [نقاط فحص النسخة](docs/review-checklist.md).
+
+## التشغيل المحلي
+
+استخدم Node.js متوافقًا مع Next.js 16. أداة تجهيز البيانات تستخدم `process.loadEnvFile` وتحتاج إصدارًا يدعمه.
+
+```powershell
+npm ci
+Copy-Item -LiteralPath '.env.example' -Destination '.env.local'
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+املأ `.env.local` قبل تشغيل التطبيق باستخدام إعدادات Firebase الخاصة ببيئة المراجعة. جميع متغيرات النموذج مطلوبة للوظائف المرتبطة بها: إعدادات العميل، حساب خدمة الإدارة، مفتاح تشفير رموز الموظفين، وكودا فتح المحل والإدارة. تتحدد صلاحية حسابَي الإدارة والمحل من `principalType` في Firebase Authentication. لا تُضمّن قيم المفاتيح أو رموز الدخول في المستودع.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+العنوان المحلي: `http://localhost:3000`. لاختبار الهاتف على الشبكة نفسها، استخدم عنوان الشبكة الذي يعرضه الخادم. إذا تغير عنوان الجهاز، حدّث `allowedDevOrigins` في `next.config.ts`.
 
-## Learn More
+## الفحوص
 
-To learn more about Next.js, take a look at the following resources:
+```powershell
+npm run lint
+npm exec tsc -- --noEmit --incremental false
+npm run test:delivery-data
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+اختبار أداة تنظيف بيانات التجربة معزول ولا يتصل بقاعدة البيانات الفعلية. ملف [نقاط فحص النسخة](docs/review-checklist.md) يوضح سيناريوهات التشغيل المهمة وحدود الفحوص المنجزة.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## بيانات التجربة والتسليم
 
-## Deploy on Vercel
+بيانات العملاء والموظفين والمخزون والعمليات محفوظة في Firebase، وليست ملفات تُرفع إلى GitHub. لم تُنفَّذ بداية البيانات النظيفة في نسخة المراجعة.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+[دليل التنظيف النهائي](docs/delivery-data-reset.md) يشرح المعاينة والنسخة الاحتياطية ونطاق الحذف. لا تشغّل `data:reset` أثناء مراجعة النظام أو مع وجود خادم/نسخة منشورة قيد الاستخدام. إعداد النسخة يتم بأمر منفصل للقراءة فقط؛ التنفيذ يتطلب مراجعة مطابقة للمشروع والبيانات وتأكيدًا صريحًا.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ملفات البيئة و`node_modules` و`.next` والنسخ الاحتياطية مستثناة من Git. أدوات التطبيق تستخدم Firebase Admin في الخادم، وتتحقق من صلاحيات الإدارة والمحل والموظف عند العمليات.

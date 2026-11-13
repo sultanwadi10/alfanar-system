@@ -1,6 +1,14 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
+import { usefulOrderSearch } from "@/lib/orders/order-search";
+import { useOperationChanges } from "@/lib/client/operation-changes";
+
+import { BottleReturnFields } from "@/components/store/bottle-return-fields";
+import type { BottleReturn } from "@/types/inventory";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import styles from "./admin-orders.module.css";
 import { AlfanarIcon } from "@/components/admin/alfanar-icon";
 
@@ -10,6 +18,10 @@ type View = "today" | "date" | "recent" | "search";
 type Filter = "ALL" | Status;
 
 type Order = {
+  inventoryTracked?: boolean;
+  returnRequirements?: Array<{ itemId: string; label: string; quantity: number }>;
+  bottleReturns?: BottleReturn[];
+  previousBottleReturns?: Array<BottleReturn & { label: string }>;
   id: string;
   number: string;
   day: string;
@@ -56,6 +68,7 @@ type Result = {
   success: boolean;
   data?: {
     orders: Order[];
+    summary?: { all: number; delivered: number; cancelled: number } | null;
     day: string | null;
     limitReached: boolean;
     hasMore: boolean;
@@ -78,9 +91,11 @@ const paymentLabels: Record<Method, string> = {
 const paymentStateLabels: Record<string, string> = {
   DUE_ON_DELIVERY: "يُحصّل عند التسليم",
   COLLECTED: "تم تحصيل المبلغ",
+  PAYMENT_DUE: "مستحق على العميل",
+  PARTIALLY_COLLECTED: "تحصيل جزئي",
   COUPONS_RESERVED: "الكوبونات محجوزة",
   COUPONS_SETTLED: "تم استهلاك الكوبونات",
-  AWAITING_BOOKLET_APPROVAL: "كوبونات معلّقة لاعتماد الدفتر",
+  AWAITING_BOOKLET_APPROVAL: "كوبونات مستحقة على العميل",
   CANCELLED: "ملغي",
 };
 const bookletLabels: Record<string, string> = {
@@ -103,7 +118,7 @@ function dateTime(value: string | null, onlyTime = false) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("ar-JO", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Amman",
     ...(onlyTime ? {} : { year: "numeric", month: "short", day: "numeric" }),
     hour: "2-digit", minute: "2-digit",
@@ -123,6 +138,9 @@ export default function AdminOrders() {
   const [view, setView] = useState<View>("today");
   const [date, setDate] = useState(jordanDate);
   const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [summary, setSummary] = useState<{ all: number; delivered: number; cancelled: number } | null>(null);
+  const readController = useRef<AbortController | null>(null);
   const [filter, setFilter] = useState<Filter>("ALL");
   const [methodFilter, setMethodFilter] = useState<"ALL" | Method>("ALL");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -130,35 +148,43 @@ export default function AdminOrders() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  useTransientMessage(notice, setNotice);
   const [hasMore, setHasMore] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const nextCursorRef = useRef<string | null>(null);
   const requestRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState<"DELIVERED" | "CANCELLED" | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
+  const [, setCancelReason] = useState("");
+  const [paymentDeferred,setPaymentDeferred]=useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async (append = false, quiet = false) => {
-    if (view === "search" && search.trim().length < 2) {
+  const load = useCallback(async (append = false, quiet = false, fresh = false) => {
+    const serial = ++requestRef.current;
+    readController.current?.abort();
+    if ((view === "search" && !usefulOrderSearch(submittedSearch)) || (view === "date" && !date)) {
       setOrders([]);
       setHasMore(false);
       setLoading(false);
+      setRefreshing(false);
+      setSummary(null);
       return;
     }
-    const serial = ++requestRef.current;
+    const controller = new AbortController();
+    readController.current = controller;
     if (quiet) setRefreshing(true);
     else setLoading(true);
     try {
       const params = new URLSearchParams({ view });
       if (view === "date") params.set("date", date);
-      if (view === "search") params.set("q", search.trim());
+      if (view === "search") params.set("q", submittedSearch.trim());
+      if (fresh) params.set("refresh", "1");
       if (view === "recent" && append && nextCursorRef.current) {
         params.set("cursor", nextCursorRef.current);
       }
       const response = await fetch(`/api/admin/delivery-orders?${params}`, {
-        cache: "no-store", credentials: "same-origin",
+        cache: "no-store", credentials: "same-origin", signal: controller.signal,
       });
       const result = await response.json() as Result;
       if (!response.ok || !result.success || !result.data) throw new Error(errorMessage(result));
@@ -171,10 +197,11 @@ export default function AdminOrders() {
       nextCursorRef.current = result.data.nextCursor;
       setHasMore(result.data.hasMore);
       setLimitReached(result.data.limitReached);
+      setSummary(result.data.summary ?? null);
       setError("");
     } catch (cause) {
-      if (serial === requestRef.current) {
-        setError(cause instanceof Error ? cause.message : "تعذر تحميل الطلبات.");
+      if (serial === requestRef.current && !controller.signal.aborted) {
+        setError(userMessage(cause instanceof Error ? cause.message : "تعذر تحميل الطلبات."));
       }
     } finally {
       if (serial === requestRef.current) {
@@ -182,24 +209,19 @@ export default function AdminOrders() {
         setRefreshing(false);
       }
     }
-  }, [view, date, search]);
+  }, [view, date, submittedSearch]);
 
   useEffect(() => {
     // Run after paint so React effects do not synchronously update state.
-    const start = window.setTimeout(() => { void load(); }, view === "search" ? 500 : 0);
+    const start = window.setTimeout(() => { void load(); }, 0);
     return () => {
       window.clearTimeout(start);
       requestRef.current += 1;
+      readController.current?.abort();
     };
   }, [load, view]);
 
-  useEffect(() => {
-    if (view !== "today") return;
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && !busy) void load(false, true);
-    }, 30000);
-    return () => window.clearInterval(interval);
-  }, [view, load, busy]);
+  useOperationChanges(["orders"], () => { void load(false, true); }, view === "today" && !busy);
 
   const filtered = useMemo(() => orders.filter((order) =>
     (filter === "ALL" || order.status === filter) &&
@@ -212,21 +234,26 @@ export default function AdminOrders() {
     ready: orders.filter((o) => o.status === "READY").length,
     delivered: orders.filter((o) => o.status === "DELIVERED").length,
     cancelled: orders.filter((o) => o.status === "CANCELLED").length,
-    due: orders.filter((o) => o.status !== "CANCELLED" && o.paymentState === "DUE_ON_DELIVERY")
-      .reduce((sum, o) => sum + o.totalFils, 0),
-    collected: orders.filter((o) => o.paymentState === "COLLECTED")
+    due: orders.filter((o) => o.status !== "CANCELLED" && ["DUE_ON_DELIVERY","PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(o.paymentState))
+      .reduce((sum, o) => sum + Math.max(0,o.totalFils-o.collectedFils), 0),
+    collected: orders.filter((o) => ["COLLECTED","PARTIALLY_COLLECTED"].includes(o.paymentState))
       .reduce((sum, o) => sum + o.collectedFils, 0),
   }), [orders]);
 
   const selected = filtered.find((order) => order.id === selectedId) ?? filtered[0] ?? null;
 
   function chooseView(next: View) {
+    if (next === view) { void load(false, true, true); return; }
     requestRef.current += 1;
+    readController.current?.abort();
     setOrders([]);
+    setSummary(null);
+    setPending(null);
     setHasMore(false);
     setLimitReached(false);
     setLoading(true);
     setView(next);
+    if (next === "search") setSubmittedSearch("");
     setFilter("ALL");
     setMethodFilter("ALL");
     setSelectedId(null);
@@ -235,10 +262,13 @@ export default function AdminOrders() {
     nextCursorRef.current = null;
   }
 
+  const [bottleReturns, setBottleReturns] = useState<BottleReturn[]>([]);
   function openAction(action: "DELIVERED" | "CANCELLED") {
     if (!selected) return;
+    setBottleReturns([]);
     setPending(action);
     setCancelReason("");
+    setPaymentDeferred(false);
     setPaymentConfirmed(false);
     setError("");
     setNotice("");
@@ -246,14 +276,12 @@ export default function AdminOrders() {
 
   async function executeAction() {
     if (!selected || !pending || busy) return;
-    if (pending === "CANCELLED" && cancelReason.trim().length < 5) {
-      setError("اكتب سبب الإلغاء من خمسة أحرف على الأقل.");
+
+    if (pending === "DELIVERED" && selected.paymentMethod !== "COUPON" && !paymentConfirmed && !paymentDeferred) {
+      setError(userMessage("اختر حالة التحصيل أولًا."));
       return;
     }
-    if (pending === "DELIVERED" && selected.paymentMethod !== "COUPON" && !paymentConfirmed) {
-      setError("أكد استلام قيمة الطلب أولًا.");
-      return;
-    }
+    if (pending === "DELIVERED" && (selected.returnRequirements ?? []).some(r => !bottleReturns.some(v => v.itemId === r.itemId && Number.isInteger(v.quantity) && v.quantity >= 0 && v.quantity <= r.quantity))) { setError(userMessage("سجّل القوارير الفارغة المستلمة لكل نوع.")); return; }
     setBusy(true);
     setError("");
     try {
@@ -261,18 +289,18 @@ export default function AdminOrders() {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pending === "CANCELLED"
-          ? { action: "CANCELLED", reason: cancelReason.trim() }
-          : { action: "DELIVERED", paymentCollected: selected.paymentMethod === "COUPON" ? false : paymentConfirmed }),
+          ? { action: "CANCELLED", reason: "إلغاء الطلب من الإدارة" }
+          : { action: "DELIVERED", bottleReturns, paymentCollected: selected.paymentMethod === "COUPON" ? false : paymentConfirmed, paymentDeferred: selected.paymentMethod !== "COUPON" && paymentDeferred }),
       });
       const result = await response.json() as Result;
       if (!response.ok || !result.success) throw new Error(errorMessage(result));
       setPending(null);
       setNotice(pending === "CANCELLED"
-        ? `تم إلغاء الطلب #${selected.number} وتسجيل سبب الإلغاء.`
+        ? `تم إلغاء الطلب #${selected.number} وحفظ الإجراء في السجل.`
         : `تم تأكيد تسليم الطلب #${selected.number} وتسجيل العملية.`);
       await load(false, true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر تحديث الطلب.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذر تحديث الطلب."));
     } finally {
       setBusy(false);
     }
@@ -281,13 +309,14 @@ export default function AdminOrders() {
   return (
     <main className={styles.page} dir="rtl">
       <header className={styles.hero}>
+        <Link className={styles.refreshButton} href="/admin/orders/new"><AlfanarIcon name="plus"/>طلب توصيل جديد</Link>
         <div>
           <div className={styles.eyebrow}><AlfanarIcon name="truck" size={17} /> <span className={styles.liveDot} /> مركز عمليات التوصيل</div>
           <h1>إدارة الطلبات</h1>
-          <p>متابعة الطلبات والتحصيل وحركة التسليم من لوحة الإدارة — جميع الأوقات بتوقيت الأردن.</p>
+
         </div>
         <button type="button" className={styles.refreshButton} disabled={loading || refreshing || busy}
-          onClick={() => void load(false, true)}>
+          onClick={() => void load(false, true, true)}>
           <AlfanarIcon name="refresh" /> {refreshing ? "جاري التحديث…" : "تحديث الطلبات"}
         </button>
       </header>
@@ -303,32 +332,39 @@ export default function AdminOrders() {
       {view === "date" && (
         <div className={styles.searchArea}>
           <label htmlFor="orderDate">اختر تاريخ الطلب</label>
-          <input id="orderDate" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <input id="orderDate" type="date" value={date} max={jordanDate()} onChange={(event) => { ++requestRef.current; readController.current?.abort(); setOrders([]); setSummary(null); setPending(null); setSelectedId(null); setFilter("ALL"); setMethodFilter("ALL"); setError(""); setNotice(""); setLimitReached(false); setLoading(true); setDate(event.target.value); }} lang="en-GB" />
         </div>
       )}
       {view === "search" && (
-        <div className={styles.searchArea}>
+        <form className={styles.searchArea} onSubmit={event => {
+          event.preventDefault(); if (!usefulOrderSearch(search)) return;
+          setFilter("ALL"); setMethodFilter("ALL"); setSelectedId(null); setPending(null); setError("");
+          if (submittedSearch === search.trim()) void load(false, true);
+          else { setOrders([]); setLoading(true); setSubmittedSearch(search.trim()); }
+        }}>
           <label htmlFor="orderSearch">ابحث في جميع التواريخ</label>
-          <input id="orderSearch" type="search" value={search} onChange={(event) => setSearch(event.target.value)}
-            placeholder="اسم العميل من بدايته، رقم هاتف كامل، أو 20261031-001" />
-          <small>البحث الشامل بالاسم من أول الاسم أو برقم الهاتف كاملًا أو بمعرّف الطلب كاملًا.</small>
-        </div>
+          <div className={styles.searchControls}><input id="orderSearch" type="search" value={search} dir="auto"
+            onChange={event => { ++requestRef.current; readController.current?.abort(); setSearch(event.target.value); setSubmittedSearch(""); setOrders([]); setSummary(null); setSelectedId(null); setPending(null); setLoading(false); setRefreshing(false); setError(""); setNotice(""); setLimitReached(false); }}
+            placeholder="اسم العميل، رقم الهاتف، أو رقم الطلب" />
+            <button type="submit" disabled={!usefulOrderSearch(search) || loading}>بحث</button></div>
+        </form>
       )}
 
-      <section className={styles.stats} aria-label="ملخص الطلبات المحملة">
-        <div className={styles.statCard}><span>إجمالي الطلبات</span><strong>{counts.all}</strong><small>ضمن النتائج المحمّلة</small></div>
-        <div className={styles.statCard}><span>جديد</span><strong className={styles.blueNumber}>{counts.new}</strong><small>بانتظار التجهيز</small></div>
-        <div className={styles.statCard}><span>جاهز</span><strong className={styles.amberNumber}>{counts.ready}</strong><small>بانتظار التسليم</small></div>
-        <div className={styles.statCard}><span>تم التسليم</span><strong className={styles.greenNumber}>{counts.delivered}</strong><small>عمليات مكتملة</small></div>
-        <div className={styles.statCard}><span>تحصيل مسجّل</span><strong className={styles.moneyNumber}>{money(counts.collected)}</strong><small>كاش وكليك فقط</small></div>
-        <div className={styles.statCard}><span>مستحق عند التسليم</span><strong className={styles.moneyNumber}>{money(counts.due)}</strong><small>طلبات لم تُحصَّل بعد</small></div>
-      </section>
+      {(view !== "search" || !!submittedSearch) && <section className={`${styles.stats} ${view !== "today" ? styles.historyStats : ""}`} aria-label="ملخص الطلبات">
+        <div className={styles.statCard}><span>{view === "date" ? "إجمالي طلبات اليوم المحدد" : view === "search" ? "المطابقات المعروضة" : view === "recent" ? "الطلبات المعروضة" : "إجمالي الطلبات"}</span><strong>{loading || error ? "—" : summary?.all ?? counts.all}</strong></div>
+        {view === "today" && <><div className={styles.statCard}><span>جديد</span><strong className={styles.blueNumber}>{loading || error ? "—" : counts.new}</strong></div>
+        <div className={styles.statCard}><span>جاهز</span><strong className={styles.amberNumber}>{loading || error ? "—" : counts.ready}</strong></div></>}
+        <div className={styles.statCard}><span>تم التسليم</span><strong className={styles.greenNumber}>{loading || error ? "—" : summary?.delivered ?? counts.delivered}</strong></div>
+        {view !== "today" && <div className={styles.statCard}><span>الطلبات الملغية</span><strong className={styles.cancelledNumber}>{loading || error ? "—" : summary?.cancelled ?? counts.cancelled}</strong></div>}
+        {view === "today" && <><div className={styles.statCard}><span>تحصيل مسجّل</span><strong className={styles.moneyNumber}>{loading || error ? "—" : money(counts.collected)}</strong></div>
+        <div className={styles.statCard}><span>المتبقي للتحصيل</span><strong className={styles.moneyNumber}>{loading || error ? "—" : money(counts.due)}</strong></div></>}
+      </section>}
 
       <section className={styles.workspace}>
         <div className={styles.listPanel}>
           <div className={styles.listTitle}>
-            <div><h2>قائمة الطلبات</h2><span>{filtered.length} طلب ظاهر</span></div>
-            <span className={styles.syncLabel}>{view === "today" ? "تحديث تلقائي كل 30 ثانية" : "عرض حسب النطاق"}</span>
+            <div><h2>{view === "search" && submittedSearch ? `نتائج «${submittedSearch}»` : view === "date" ? `طلبات ${date}` : "قائمة الطلبات"}</h2><span>{loading ? "جارٍ التحميل…" : `${filtered.length} طلب ظاهر`}</span></div>
+
           </div>
           <div className={styles.filters}>
             <label>الحالة
@@ -345,11 +381,12 @@ export default function AdminOrders() {
             </label>
           </div>
 
-          {limitReached && <div className={styles.warning} role="status">وصلت النتائج للحد الأعلى لهذا البحث. ضيّق التاريخ أو البحث للحصول على نتائج أدق.</div>}
+          {limitReached && <div className={styles.warning} role="status">النتائج المعروضة جزئية. ضيّق التاريخ أو البحث.</div>}
           {notice && <div className={styles.success} role="status">{notice}</div>}
+          {pending === "DELIVERED" && selected && <BottleReturnFields requirements={selected.returnRequirements ?? []} value={bottleReturns} onChange={setBottleReturns} disabled={busy}/>}
           {error && <div className={styles.error} role="alert">{error}</div>}
           {loading && <div className={styles.empty}>جارٍ تحميل طلبات التوصيل…</div>}
-          {!loading && filtered.length === 0 && <div className={styles.empty}>{view === "search" && search.trim().length < 2 ? "اكتب حرفين على الأقل للبحث الشامل." : "ما في طلبات مطابقة للخيارات الحالية."}</div>}
+          {!loading && filtered.length === 0 && <div className={styles.empty}>{view === "search" && !submittedSearch ? "اكتب بيانات البحث واضغط «بحث»." : "ما في طلبات مطابقة للخيارات الحالية."}</div>}
           <div className={styles.orderList}>
             {!loading && filtered.map((order) => (
               <button type="button" key={order.id}
@@ -374,7 +411,7 @@ export default function AdminOrders() {
               {refreshing ? "جارٍ جلب المزيد…" : "تحميل طلبات أقدم"}
             </button>
           )}
-          <p className={styles.scopeNote}>الإحصائيات والفلاتر تخص النتائج المحمّلة فقط. استخدم التاريخ أو البحث الشامل للوصول لطلبات أقدم.</p>
+
         </div>
 
         <div className={styles.detailPanel}>
@@ -382,7 +419,7 @@ export default function AdminOrders() {
             <div className={styles.noSelection}>
               <span aria-hidden="true">▤</span>
               <h2>تفاصيل الطلب</h2>
-              <p>اختر طلبًا من القائمة لعرض التفاصيل والإجراءات.</p>
+              <p>لم يتم تحديد طلب.</p>
             </div>
           ) : (
             <>
@@ -424,13 +461,16 @@ export default function AdminOrders() {
                   {selected.paymentMethod === "COUPON" && <>
                     <div><span>الكوبونات المطلوبة</span><b>{selected.couponQuantity}</b></div>
                     <div><span>المحجوزة من دفاتر نشطة</span><b>{selected.reservedCouponQuantity}</b></div>
-                    <div><span>المعلّقة لاعتماد دفتر</span><b>{selected.pendingCouponQuantity}</b></div>
+                    <div><span>الكوبونات المتبقية</span><b>{selected.pendingCouponQuantity}</b></div>
                   </>}
                   {selected.bookletRequestStatus && <div><span>طلب دفتر جديد</span><b>{bookletLabels[selected.bookletRequestStatus] ?? selected.bookletRequestStatus}</b></div>}
                   <div><span>سجّل الطلب</span><b>{selected.createdBy}</b></div>
                 </div>
-                {selected.pendingCouponQuantity > 0 && <div className={styles.warning}>تنبيه: هناك كوبونات معلّقة. تأكيد التسليم لا يعتمد دفترًا جديدًا ولا يسوّي الجزء المعلّق.</div>}
+                {selected.pendingCouponQuantity > 0 && <div className={styles.warning}>المتبقي على العميل: {selected.pendingCouponQuantity} كوبون</div>}
               </section>
+              {!!selected.previousBottleReturns?.length && <section className={styles.detailSection}><h3>تسوية قوارير من طلبات سابقة</h3>{selected.previousBottleReturns.map(row => <p key={row.itemId}>{row.label}: {row.quantity}</p>)}</section>}
+              {(selected.returnRequirements ?? []).length > 0 && <section className={styles.detailSection}><h3>القوارير الفارغة واستحقاق العميل</h3>{selected.returnRequirements!.map(row => { const received = selected.bottleReturns?.find(v => v.itemId === row.itemId)?.quantity ?? 0; return <div className={styles.noteBox} key={row.itemId}><strong>{row.label}</strong><p>قوارير الطلب: {row.quantity}{selected.status === "DELIVERED" ? ` — المستلم فارغًا: ${received} — النقص المسجل وقت التسليم: ${row.quantity - received}` : " — يُسجّل الاستلام عند التسليم"}</p></div>; })}</section>}
+
               <section className={styles.detailSection}>
                 <div className={styles.sectionHead}><h3>سجل حركة الطلب</h3><span>{selected.history.length} إجراء</span></div>
                 <div className={styles.timeline}>
@@ -445,10 +485,10 @@ export default function AdminOrders() {
               </section>
               <section className={styles.actionsPanel}>
                 <h3>الإجراءات الإدارية</h3>
-                {selected.status === "NEW" && <p>تجهيز الطلب من صلاحية الموظف. يمكن للإدارة إلغاء الطلب قبل التسليم.</p>}
-                {selected.status === "READY" && <p>يمكن للإدارة تأكيد التسليم أو إلغاء الطلب، مع تسجيل العملية باسم الإدارة.</p>}
-                {selected.status === "DELIVERED" && <p>تم إغلاق الطلب بالتسليم. لا يسمح النظام بإعادة تحصيله أو إلغائه من هذه الشاشة.</p>}
-                {selected.status === "CANCELLED" && <p>الطلب ملغي ولا يمكن تغيير حالته.</p>}
+
+
+                {selected.status === "DELIVERED" && <p>تم تسليم الطلب.</p>}
+                {selected.status === "CANCELLED" && <p>الطلب ملغي.</p>}
                 <div className={styles.actionButtons}>
                   {selected.status === "READY" && <button type="button" className={styles.deliverButton} disabled={busy} onClick={() => openAction("DELIVERED")}>تأكيد التسليم</button>}
                   {(selected.status === "NEW" || selected.status === "READY") && <button type="button" className={styles.cancelButton} disabled={busy} onClick={() => openAction("CANCELLED")}>إلغاء الطلب</button>}
@@ -464,24 +504,23 @@ export default function AdminOrders() {
           <div className={styles.modalTop}><h2 id="modalTitle">{pending === "DELIVERED" ? "تأكيد تسليم الطلب" : "إلغاء طلب التوصيل"}</h2><button type="button" aria-label="إغلاق" disabled={busy} onClick={() => setPending(null)}>×</button></div>
           <p>طلب <b>#{selected.number}</b> — {selected.customerName}</p>
           {pending === "CANCELLED" ? <>
-            <p className={styles.modalHelp}>سيتم تحرير الكوبونات المحجوزة وإلغاء طلب الدفتر المعلّق إن وجد. لا يمكن التراجع عن الإجراء.</p>
-            <label className={styles.modalField}>سبب الإلغاء (إلزامي)
-              <textarea rows={3} maxLength={250} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="مثال: العميل ألغى الطلب قبل التسليم" />
-            </label>
+            <p className={styles.modalHelp}>سيُلغى الطلب. مواد التعبئة المستهلكة لا تعود للمخزون.</p>
+
           </> : <>
             <div className={styles.amountBox}>إجمالي الطلب <strong>{money(selected.totalFils)}</strong></div>
             {selected.paymentMethod === "COUPON"
-              ? <p className={styles.modalHelp}>سيتم خصم الكوبونات المحجوزة فقط. إذا بقيت كوبونات معلّقة فستحتاج اعتماد الدفتر من الإدارة لاحقًا.</p>
+              ? <p className={styles.modalHelp}>سيتم خصم الكوبونات المحجوزة.</p>
               : <label className={styles.checkboxField}>
-                  <input type="checkbox" checked={paymentConfirmed} onChange={(event) => setPaymentConfirmed(event.target.checked)} />
-                  أؤكد أنه تم تسليم الطلب واستلام المبلغ بواسطة {paymentLabels[selected.paymentMethod]}، وأفهم أنه سيُضاف إلى الشفت المفتوح الأصلي للطلب.
+                  <input type="radio" name="adminCollection" checked={paymentConfirmed} onChange={() => {setPaymentConfirmed(true);setPaymentDeferred(false);}} />
+                  أؤكد أنه تم تسليم الطلب واستلام المبلغ بواسطة {paymentLabels[selected.paymentMethod]}.
                 </label>}
+            {selected.paymentMethod !== "COUPON" && <label className={styles.checkboxField}><input type="radio" name="adminCollection" checked={paymentDeferred} onChange={()=>{setPaymentDeferred(true);setPaymentConfirmed(false);}}/> تم تسليم الطلب والمبلغ باقي على العميل</label>}
           </>}
           {error && <div className={styles.error} role="alert">{error}</div>}
           <div className={styles.modalButtons}>
             <button type="button" className={styles.neutralButton} disabled={busy} onClick={() => { setPending(null); setError(""); }}>رجوع</button>
             <button type="button" className={pending === "CANCELLED" ? styles.cancelButton : styles.deliverButton}
-              disabled={busy || (pending === "CANCELLED" ? cancelReason.trim().length < 5 : selected.paymentMethod !== "COUPON" && !paymentConfirmed)}
+              disabled={busy || (pending === "CANCELLED" ? false : selected.paymentMethod !== "COUPON" && !paymentConfirmed && !paymentDeferred)}
               onClick={() => void executeAction()}>{busy ? "جارٍ الحفظ…" : pending === "CANCELLED" ? "اعتماد الإلغاء" : "اعتماد التسليم"}</button>
           </div>
         </div>

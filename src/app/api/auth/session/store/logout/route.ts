@@ -20,7 +20,7 @@ export async function POST(request: Request) {
             "INVALID_ORIGIN",
 
           message:
-            "The request origin is not allowed.",
+            "الطلب غير مسموح.",
         },
       },
       {

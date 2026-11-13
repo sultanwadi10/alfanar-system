@@ -1,3 +1,4 @@
+import { trustedRequestFingerprint } from "@/lib/security/request-fingerprint";
 import "server-only";
 
 import {
@@ -232,31 +233,7 @@ async function clearPairingAttempts(
   }
 }
 
-export function buildPairingRequestFingerprint(
-  request: Request,
-) {
-  const forwardedFor =
-    request.headers.get(
-      "x-forwarded-for",
-    );
-
-  const ip =
-    forwardedFor
-      ?.split(",")[0]
-      ?.trim() ||
-    request.headers.get(
-      "x-real-ip",
-    ) ||
-    "local";
-
-  const userAgent =
-    request.headers.get(
-      "user-agent",
-    ) ||
-    "unknown";
-
-  return `${ip}|${userAgent}`;
-}
+export function buildPairingRequestFingerprint(request:Request){return trustedRequestFingerprint(request,"store-pairing");}
 
 export async function createStoreDevicePairingCode(
   adminAuthUid: string,

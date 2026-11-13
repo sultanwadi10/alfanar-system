@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
 import { saveShiftTimeSettings } from "@/lib/employees/employee-schedule-repository";
@@ -8,7 +9,7 @@ import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { shiftTimeSettingsSchema } from "@/lib/validation/employee-schedule";
 
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
 ) {
   try {
@@ -133,3 +134,5 @@ export async function PATCH(
     );
   }
 }
+
+export const PATCH = withOperationChanges(handlePATCH, ["access","home"]);

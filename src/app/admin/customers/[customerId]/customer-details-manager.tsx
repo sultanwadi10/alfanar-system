@@ -1,4 +1,7 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
+import { useConfirmation } from "@/lib/client/use-confirmation";
 
 import {
   type FormEvent,
@@ -7,11 +10,13 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { dinars,parseDinars } from "@/lib/format/money-input";
 import styles from "./customer-details.module.css";
 
 import { CustomerBookletWallet, type CustomerWalletData } from "./customer-booklet-wallet";
 
 type CustomerDetailsData = {
+  specialDelivery20LPriceFils?: number | null;
   id: string;
 
   name: string;
@@ -48,8 +53,11 @@ export function CustomerDetailsManager({
   customer,
   walletData,
 }: CustomerDetailsManagerProps) {
+  const { confirm, confirmationDialog } = useConfirmation();
   const router = useRouter();
 
+  const [specialEnabled,setSpecialEnabled]=useState(customer.specialDelivery20LPriceFils!=null);
+  const [specialPrice,setSpecialPrice]=useState(customer.specialDelivery20LPriceFils!=null?(customer.specialDelivery20LPriceFils/1000).toFixed(3):"");
   const [editing, setEditing] =
     useState(false);
 
@@ -90,8 +98,11 @@ export function CustomerDetailsManager({
     successMessage,
     setSuccessMessage,
   ] = useState("");
+  useTransientMessage(successMessage, setSuccessMessage);
 
   function cancelEditing() {
+    setSpecialEnabled(customer.specialDelivery20LPriceFils!=null);
+    setSpecialPrice(customer.specialDelivery20LPriceFils!=null?(customer.specialDelivery20LPriceFils/1000).toFixed(3):"");
     setName(customer.name);
 
     setPhone(customer.phone);
@@ -113,6 +124,8 @@ export function CustomerDetailsManager({
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+    const special=specialEnabled?parseDinars(specialPrice):null;
+    if(specialEnabled&&(special===null||special>10_000_000)){setErrorMessage(userMessage("أدخل سعرًا صحيحًا بالدينار، حتى ثلاث منازل عشرية."));return;}
 
     setLoading(true);
 
@@ -136,6 +149,7 @@ export function CustomerDetailsManager({
             phone,
             primaryAddress,
             adminNotes,
+            specialDelivery20LPriceFils: special,
           }),
         },
       );
@@ -148,8 +162,8 @@ export function CustomerDetailsManager({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-            "تعذر تعديل بيانات العميل.",
+          userMessage(data?.error?.message ??
+            "تعذر تعديل بيانات العميل."),
         );
 
         return;
@@ -164,7 +178,7 @@ export function CustomerDetailsManager({
       router.refresh();
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء الاتصال بالخدمة.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -173,9 +187,7 @@ export function CustomerDetailsManager({
 
   async function handleArchive() {
     const confirmed =
-      window.confirm(
-        "هل أنت متأكد من أرشفة هذا العميل؟ لن يتم حذف سجله أو رقم هاتفه من النظام.",
-      );
+      await confirm({"title":"أرشفة العميل؟","confirmLabel":"أرشفة","tone":"warning"});
 
     if (!confirmed) {
       return;
@@ -203,8 +215,8 @@ export function CustomerDetailsManager({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-            "تعذر أرشفة العميل.",
+          userMessage(data?.error?.message ??
+            "تعذر أرشفة العميل."),
         );
 
         return;
@@ -217,7 +229,7 @@ export function CustomerDetailsManager({
       router.refresh();
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء أرشفة العميل.",
+        userMessage("حدث خطأ أثناء أرشفة العميل."),
       );
     } finally {
       setArchiving(false);
@@ -391,10 +403,7 @@ export function CustomerDetailsManager({
                 بيانات العميل
               </h2>
 
-              <p>
-                المعلومات الأساسية
-                المحفوظة داخل النظام.
-              </p>
+
             </div>
 
             {!editing &&
@@ -460,12 +469,7 @@ export function CustomerDetailsManager({
                 />
 
                 {customer.appLinked && (
-                  <small>
-                    رقم الهاتف مقفل لأن
-                    العميل مرتبط بالتطبيق.
-                    تغيير الرقم سيحتاج
-                    آلية تحقق منفصلة لاحقًا.
-                  </small>
+                  null
                 )}
               </label>
 
@@ -486,6 +490,7 @@ export function CustomerDetailsManager({
                 />
               </label>
 
+              <div className={styles.specialPriceSettings}><label className={styles.specialPriceToggle}><input type="checkbox" checked={specialEnabled} onChange={event=>setSpecialEnabled(event.target.checked)} disabled={loading}/>سعر خاص لتعبئة 20 لتر بالتوصيل</label>{specialEnabled&&<label>سعر القارورة — بالدينار<input inputMode="decimal" lang="en-GB" dir="ltr" value={specialPrice} onChange={event=>setSpecialPrice(event.target.value)} placeholder="0.750" required disabled={loading}/></label>}</div>
               <label>
                 ملاحظات داخلية
 
@@ -500,10 +505,7 @@ export function CustomerDetailsManager({
                   disabled={loading}
                 />
 
-                <small>
-                  لا تظهر هذه الملاحظات
-                  للعميل داخل التطبيق.
-                </small>
+
               </label>
 
               <div
@@ -606,6 +608,7 @@ export function CustomerDetailsManager({
                 </strong>
               </div>
 
+              <div className={styles.detailRow}><span>سعر تعبئة 20 لتر بالتوصيل</span><strong>{customer.specialDelivery20LPriceFils!=null?<><bdi>{dinars(customer.specialDelivery20LPriceFils)}</bdi> د.أ</>:"السعر الافتراضي"}</strong></div>
               <div
                 className={
                   styles.notesRow
@@ -641,12 +644,7 @@ export function CustomerDetailsManager({
                   أرشفة العميل
                 </h2>
 
-                <p>
-                  الأرشفة تخفي العميل من
-                  القوائم التشغيلية، لكن
-                  تحتفظ بملفه ورقم هاتفه
-                  وسجله داخل النظام.
-                </p>
+
               </div>
 
               <button
@@ -697,6 +695,7 @@ export function CustomerDetailsManager({
           )}
         </div>
       </div>
+    {confirmationDialog}
     </div>
   );
 }

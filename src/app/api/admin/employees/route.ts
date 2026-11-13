@@ -1,3 +1,5 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
+import { hasValidOrigin } from "@/lib/security/has-valid-origin";
 import { NextResponse } from "next/server";
 
 import { createEmployeeRecord } from "@/lib/employees/employee-repository";
@@ -7,11 +9,13 @@ import { isSecurityError } from "@/lib/security/is-security-error";
 import { toSecurityResponse } from "@/lib/security/to-security-response";
 import { createEmployeeSchema } from "@/lib/validation/employee";
 
-export async function POST(
+async function handlePOST(
   request: Request,
 ) {
   try {
     await getAdminSecurityContext();
+
+    if (!hasValidOrigin(request)) return NextResponse.json({ success: false, error: { message: "الطلب غير مسموح." } }, { status: 403 });
 
     const body = await request.json();
 
@@ -28,7 +32,7 @@ export async function POST(
             code:
               "INVALID_EMPLOYEE_INPUT",
             message:
-              "Employee name or PIN is invalid.",
+              "تحقق من اسم الموظف ورمز الدخول.",
           },
         },
         {
@@ -73,7 +77,7 @@ export async function POST(
           code:
             "EMPLOYEE_CREATE_FAILED",
           message:
-            "The employee could not be created.",
+            "تعذّرت إضافة الموظف. حاول مجددًا.",
         },
       },
       {
@@ -82,3 +86,4 @@ export async function POST(
     );
   }
 }
+export const POST = withOperationChanges(handlePOST, ["access","home"]);

@@ -97,7 +97,7 @@ export default function ActionModal({
         if (event.target === event.currentTarget && !busy) onClose();
       }}>
       <div ref={panelRef} className={`${styles.panel} ${styles[tone]}`}
-        role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
+        role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
         <div className={styles.heading}>
           <div className={styles.marker} aria-hidden="true">
             {tone === "danger" ? "!" : tone === "warning" ? "•" : "✓"}
@@ -105,7 +105,7 @@ export default function ActionModal({
           <h2 id={titleId}>{title}</h2>
           <button type="button" className={styles.close} onClick={onClose} disabled={busy} aria-label="إغلاق النافذة">×</button>
         </div>
-        <p id={descriptionId} className={styles.description}>{description}</p>
+        {description && <p id={descriptionId} className={styles.description}>{description}</p>}
         {choices && choices.length > 0 && (
           <fieldset className={styles.options} disabled={busy}>
             <legend>اختر طريقة التحصيل</legend>

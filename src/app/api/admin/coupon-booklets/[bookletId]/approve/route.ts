@@ -1,3 +1,4 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { approveBookletRequest, BookletError } from "@/lib/coupons/booklet-service";
@@ -10,7 +11,7 @@ const schema = z.object({ orderId: z.string().regex(/^\d{8}-\d{3,8}$/) }).strict
 function fail(message: string, code: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
-export async function POST(request: Request, context: { params: Promise<{ bookletId: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ bookletId: string }> }) {
   try {
     const admin = await getAdminSecurityContext();
     if (!hasValidOrigin(request)) return fail("الطلب غير مسموح.", "FORBIDDEN", 403);
@@ -29,3 +30,5 @@ export async function POST(request: Request, context: { params: Promise<{ bookle
     return fail("تعذر اعتماد الدفتر.", "INTERNAL_ERROR", 500);
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home","catalog"]);

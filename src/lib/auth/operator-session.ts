@@ -1,4 +1,5 @@
 import "server-only";
+import { OPERATOR_SESSION_CUTOFFS, operatorSessionCutoffId } from "./operator-session-cutoff";
 
 import {
   createHash,
@@ -14,12 +15,14 @@ import {
   type EmployeeAuthRecord,
 } from "@/lib/employees/employee-repository";
 import { getEmployeeCurrentScheduleAccess } from "@/lib/employees/employee-schedule-repository";
+import { getActiveShift } from "@/lib/shifts/shift-repository";
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 
 const OPERATOR_SESSIONS_COLLECTION =
   "operatorSessions";
 
 type OperatorSessionRecord = {
+  authVersion?: number;
   storeAuthUid: string;
 
   employeeId: string;
@@ -99,6 +102,7 @@ export async function createOperatorSession(
   const record: OperatorSessionRecord =
     {
       storeAuthUid,
+      authVersion: employee.authVersion ?? 0,
 
       employeeId:
         employee.id,
@@ -136,6 +140,7 @@ export async function createOperatorSession(
 
 export async function resolveOperatorSession(
   storeAuthUid: string,
+  options: { handoverOnly?: boolean } = {},
 ): Promise<ResolvedOperatorSession | null> {
   const cookieStore =
     await cookies();
@@ -184,6 +189,10 @@ export async function resolveOperatorSession(
     return null;
   }
 
+  // One successful handover invalidates all older sessions for this employee in this store.
+  const cutoff=(await firestore.collection(OPERATOR_SESSION_CUTOFFS).doc(operatorSessionCutoffId(storeAuthUid,record.employeeId)).get()).data()?.invalidBefore;
+  if(cutoff instanceof Timestamp && (!(record.createdAt instanceof Timestamp) || record.createdAt.toMillis()<=cutoff.toMillis()))return null;
+
   const employee =
     await getEmployeeAuthRecord(
       record.employeeId,
@@ -191,7 +200,8 @@ export async function resolveOperatorSession(
 
   if (
     !employee ||
-    !employee.isActive
+    !employee.isActive ||
+    (record.authVersion ?? 0) !== (employee.authVersion ?? 0)
   ) {
     await reference.update({
       revokedAt:
@@ -205,9 +215,8 @@ export async function resolveOperatorSession(
    * مهم:
    * الجدول يعاد فحصه عند كل Resolve.
    *
-   * يعني لو انتهى دوام الموظف،
-   * أو الأدمن غيّر جدوله أثناء الجلسة،
-   * لا تبقى الجلسة صالحة تشغيليًا.
+   * انتهاء الدوام يمنع العمليات، مع السماح لنقطة التسليم فقط
+   * بالتحقق من صاحب الشفت المفتوح. لا تمديد لعمر الجلسة.
    */
   const scheduleAccess =
     await getEmployeeCurrentScheduleAccess(
@@ -217,12 +226,9 @@ export async function resolveOperatorSession(
   if (
     !scheduleAccess.allowed
   ) {
-    await reference.update({
-      revokedAt:
-        Timestamp.now(),
-    });
-
-    return null;
+    if (!options.handoverOnly) return null;
+    const activeShift = await getActiveShift(storeAuthUid);
+    if (!activeShift || activeShift.openedByEmployeeId !== employee.id) return null;
   }
 
   return {

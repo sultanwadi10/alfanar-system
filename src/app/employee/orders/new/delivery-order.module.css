@@ -1,26 +1,26 @@
 .page {
 
-  --order-bg: #f0f5fa;
+  --order-bg: var(--store-ui-bg, #f0f5fa);
 
-  --order-card: #ffffff;
+  --order-card: var(--store-ui-card, #ffffff);
 
-  --order-soft: #f6f9fd;
+  --order-soft: var(--store-ui-soft, #f6f9fd);
 
-  --order-soft-blue: #ebf2ff;
+  --order-soft-blue: var(--store-ui-soft-blue, #ebf2ff);
 
-  --order-text: #152a40;
+  --order-text: var(--store-ui-text, #152a40);
 
-  --order-muted: #71849a;
+  --order-muted: var(--store-ui-muted, #71849a);
 
-  --order-border: #dce6f0;
+  --order-border: var(--store-ui-border, #dce6f0);
 
-  --order-primary: #2864e6;
+  --order-primary: var(--store-ui-primary, #2864e6);
 
   --order-primary-dark: #174ebc;
 
-  --order-success: #15936c;
+  --order-success: var(--store-ui-success, #15936c);
 
-  --order-success-soft: #e6f8f1;
+  --order-success-soft: var(--store-ui-success-bg, #e6f8f1);
 
   --order-shadow:
 
@@ -56,27 +56,27 @@
 
 :global(html[data-theme="dark"]) .page {
 
-  --order-bg: #0d1722;
+  --order-bg: var(--store-ui-bg, #0d1722);
 
-  --order-card: #162636;
+  --order-card: var(--store-ui-card, #162636);
 
-  --order-soft: #1d3041;
+  --order-soft: var(--store-ui-soft, #1d3041);
 
-  --order-soft-blue: #1b3456;
+  --order-soft-blue: var(--store-ui-soft-blue, #1b3456);
 
-  --order-text: #f0f5fb;
+  --order-text: var(--store-ui-text, #f0f5fb);
 
-  --order-muted: #a0b4c6;
+  --order-muted: var(--store-ui-muted, #a0b4c6);
 
-  --order-border: #2c4358;
+  --order-border: var(--store-ui-border, #2c4358);
 
-  --order-primary: #6b9eff;
+  --order-primary: var(--store-ui-primary, #6b9eff);
 
   --order-primary-dark: #92b8ff;
 
-  --order-success: #58d4a6;
+  --order-success: var(--store-ui-success, #58d4a6);
 
-  --order-success-soft: #173c34;
+  --order-success-soft: var(--store-ui-success-bg, #173c34);
 
   --order-shadow:
 
@@ -182,7 +182,7 @@
 
   border-radius: 50%;
 
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
 
   box-shadow:
 
@@ -1604,7 +1604,7 @@
 
   border-color: var(--order-primary);
 
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
 
   color: #ffffff;
 
@@ -1882,7 +1882,7 @@
 
   border-color: var(--order-primary);
 
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
 
   color: #ffffff;
 
@@ -2124,7 +2124,7 @@
 
   justify-content: flex-end;
 
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
 
 }
 
@@ -2406,7 +2406,7 @@
 
   border-radius: 12px;
 
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
 
   color: #ffffff;
 
@@ -3076,7 +3076,7 @@
 
     flex: none;
 
-    grid-template-columns: 42px 1fr;
+    grid-template-columns: 42px minmax(0, 1fr);
 
     column-gap: 11px;
 
@@ -3200,7 +3200,7 @@
 
   .formGrid {
 
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
 
     gap: 17px;
 
@@ -3242,7 +3242,7 @@
 
   .productsGrid {
 
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
 
   }
 
@@ -3564,7 +3564,7 @@
   padding: 0 15px;
   border: 0;
   border-radius: 10px;
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #fff;
   font-size: 0.76rem;
   font-weight: 850;
@@ -3643,7 +3643,7 @@
 }
 .successActions button:first-child {
   border-color: var(--order-primary);
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #fff;
 }
 @media (max-width: 740px) {
@@ -3673,6 +3673,6 @@
 }
 .customerActions button:first-child {
   border-color: var(--order-primary);
-  background: var(--order-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #fff;
 }

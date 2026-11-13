@@ -1,4 +1,7 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
+import { useConfirmation } from "@/lib/client/use-confirmation";
 
 import {
   useState,
@@ -32,7 +35,7 @@ function formatUpdatedAt(
   }
 
   return new Intl.DateTimeFormat(
-    "ar-JO",
+    "en-GB",
     {
       timeZone:
         "Asia/Amman",
@@ -51,6 +54,7 @@ function formatUpdatedAt(
 export function StoreRuntimeControl({
   initialState,
 }: StoreRuntimeControlProps) {
+  const { confirm, confirmationDialog } = useConfirmation();
   const [
     state,
     setState,
@@ -76,6 +80,7 @@ export function StoreRuntimeControl({
     setSuccessMessage,
   ] =
     useState("");
+  useTransientMessage(successMessage, setSuccessMessage);
 
   const isRunning =
     state.status ===
@@ -94,15 +99,7 @@ export function StoreRuntimeControl({
       "STOPPED"
     ) {
       const confirmed =
-        window.confirm(
-          [
-            "إيقاف نظام المحل؟",
-            "",
-            "سيتم إبطال جلسة المحل الحالية وتسجيل خروج الموظف وإخفاء واجهة التشغيل.",
-            "",
-            "الشفت المفتوح والمبيعات المسجلة لن يتم حذفها أو إغلاقها.",
-          ].join("\n"),
-        );
+        await confirm({"title":"إيقاف نظام المحل؟","description":"سيتم تسجيل خروج الموظفين.","confirmLabel":"إيقاف النظام","tone":"danger"});
 
       if (!confirmed) {
         return;
@@ -146,8 +143,8 @@ export function StoreRuntimeControl({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر تغيير حالة النظام.",
+          userMessage(data?.error?.message ??
+          "تعذر تغيير حالة النظام."),
         );
 
         return;
@@ -164,12 +161,12 @@ export function StoreRuntimeControl({
       setSuccessMessage(
         nextStatus ===
           "STOPPED"
-          ? "تم إيقاف وصول أجهزة المحل وإبطال الجلسات الحالية."
-          : "تم السماح بتشغيل نظام المحل من جديد.",
+          ? "تم إيقاف نظام المحل."
+          : "تم تشغيل نظام المحل.",
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(
@@ -230,11 +227,7 @@ export function StoreRuntimeControl({
               لها بالعمل.
             </strong>
 
-            <p>
-              الجلسات الصالحة تستطيع
-              استخدام نظام الموظفين
-              والبيع والشفتات.
-            </p>
+
           </>
         ) : (
           <>
@@ -243,12 +236,7 @@ export function StoreRuntimeControl({
               مقفول.
             </strong>
 
-            <p>
-              جلسات المحل القديمة
-              أصبحت غير صالحة ولن
-              تعود للعمل عند إعادة
-              تشغيل النظام.
-            </p>
+
           </>
         )}
       </div>
@@ -270,25 +258,9 @@ export function StoreRuntimeControl({
           </strong>
         </div>
 
-        <div>
-          <span>
-            الشفت المفتوح
-          </span>
 
-          <strong>
-            لا يتم إغلاقه
-          </strong>
-        </div>
 
-        <div>
-          <span>
-            المبيعات
-          </span>
 
-          <strong>
-            تبقى محفوظة
-          </strong>
-        </div>
       </div>
 
       {errorMessage && (
@@ -357,23 +329,8 @@ export function StoreRuntimeControl({
         )}
       </div>
 
-      <div
-        className={
-          styles.warningBox
-        }
-      >
-        <strong>
-          ملاحظة أمنية
-        </strong>
 
-        <p>
-          إيقاف النظام لا يعني
-          إنهاء الشفت. وظيفته إبطال
-          وصول جهاز المحل وإجباره
-          على تسجيل دخول جديد عند
-          إعادة السماح بالتشغيل.
-        </p>
-      </div>
+    {confirmationDialog}
     </div>
   );
 }

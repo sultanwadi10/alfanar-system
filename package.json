@@ -6,12 +6,15 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "data:prepare": "node scripts/delivery-data.mjs prepare",
+    "data:reset": "node scripts/delivery-data.mjs reset",
+    "test:delivery-data": "node scripts/tests/delivery-data.test.mjs"
   },
   "dependencies": {
-    "firebase": "13.1.0",
+    "firebase": "13.2.0",
     "firebase-admin": "14.5.0",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.6.6"
@@ -21,7 +24,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.3",
+    "eslint-config-next": "16.4.5",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7",
+    "glob": "14.0.4",
+    "minimatch": "11.0.5"
   }
 }

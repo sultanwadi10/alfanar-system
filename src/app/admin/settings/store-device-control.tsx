@@ -1,4 +1,6 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useConfirmation } from "@/lib/client/use-confirmation";
 
 import {
   useCallback,
@@ -26,7 +28,7 @@ function formatDateTime(
   value: string,
 ) {
   return new Intl.DateTimeFormat(
-    "ar-JO",
+    "en-GB",
     {
       timeZone:
         "Asia/Amman",
@@ -51,6 +53,7 @@ function formatPairingCode(
 export function StoreDeviceControl({
   initialDevices,
 }: StoreDeviceControlProps) {
+  const { confirm, confirmationDialog } = useConfirmation();
   const [devices, setDevices] =
     useState<StoreDeviceSummary[]>(
       initialDevices,
@@ -115,8 +118,8 @@ export function StoreDeviceControl({
           ) {
             if (!silent) {
               setErrorMessage(
-                data?.error?.message ??
-                "تعذر تحديث قائمة الأجهزة.",
+                userMessage(data?.error?.message ??
+                "تعذر تحديث قائمة الأجهزة."),
               );
             }
 
@@ -129,7 +132,7 @@ export function StoreDeviceControl({
         } catch {
           if (!silent) {
             setErrorMessage(
-              "تعذر الاتصال بالخادم.",
+              userMessage("تعذّر الاتصال. حاول مجددًا."),
             );
           }
         } finally {
@@ -169,8 +172,8 @@ export function StoreDeviceControl({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر إنشاء رمز ربط الجهاز.",
+          userMessage(data?.error?.message ??
+          "تعذر إنشاء رمز ربط الجهاز."),
         );
         return;
       }
@@ -188,7 +191,7 @@ export function StoreDeviceControl({
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoadingAction("");
@@ -207,15 +210,7 @@ export function StoreDeviceControl({
     }
 
     const confirmed =
-      window.confirm(
-        [
-          `إلغاء صلاحية الجهاز: ${device.name}؟`,
-          "",
-          "سيتم رفض جلسة المحل على هذا الجهاز فورًا عند أول فحص أمني، ولن يستطيع الدخول مجددًا إلا بربطه من جديد.",
-          "",
-          "الشفت والمبيعات لا يتم حذفهما.",
-        ].join("\n"),
-      );
+      await confirm({"title":"إلغاء صلاحية الجهاز؟","description":"سيتوقف وصول الجهاز حتى إعادة ربطه.","confirmLabel":"إلغاء الصلاحية","tone":"danger"});
 
     if (!confirmed) {
       return;
@@ -244,8 +239,8 @@ export function StoreDeviceControl({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-          "تعذر إلغاء صلاحية الجهاز.",
+          userMessage(data?.error?.message ??
+          "تعذر إلغاء صلاحية الجهاز."),
         );
         return;
       }
@@ -259,7 +254,7 @@ export function StoreDeviceControl({
       );
     } catch {
       setErrorMessage(
-        "تعذر الاتصال بالخادم.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoadingAction("");
@@ -346,21 +341,13 @@ export function StoreDeviceControl({
         }
       >
         <div>
-          <span
-            className={
-              styles.sectionLabel
-            }
-          >
-            DEVICE PAIRING
-          </span>
+
 
           <h2>
             أجهزة المحل المصرح بها
           </h2>
 
-          <p>
-            حساب المحل وحده لا يكفي. يجب أن يحمل المتصفح اعتماد جهاز سري صادر من الإدارة.
-          </p>
+
         </div>
 
         <div
@@ -456,9 +443,7 @@ export function StoreDeviceControl({
             </strong>
           </div>
 
-          <p>
-            على شاشة الساعة في جهاز المحل: اضغط على منطقة الساعة 7 مرات بسرعة، ثم أدخل الرمز واسم الجهاز.
-          </p>
+
         </div>
       )}
 
@@ -589,20 +574,7 @@ export function StoreDeviceControl({
           )
         )}
       </div>
-
-      <div
-        className={
-          styles.deviceSecurityNote
-        }
-      >
-        <strong>
-          طبقات الوصول الحالية
-        </strong>
-
-        <p>
-          جهاز مصرح + حساب المحل + PIN الموظف + شفت صحيح. إلغاء الجهاز لا يغلق الشفت ولا يحذف أي عملية محفوظة.
-        </p>
-      </div>
+    {confirmationDialog}
     </section>
   );
 }

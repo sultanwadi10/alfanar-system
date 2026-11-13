@@ -1,4 +1,5 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -50,7 +51,7 @@ export default function EmployeeCustomers() {
       } catch (cause) {
         if (!controller.signal.aborted) {
           setResults([]);
-          setError(cause instanceof Error ? cause.message : "تعذر البحث.");
+          setError(userMessage(cause instanceof Error ? cause.message : "تعذر البحث."));
         }
       } finally {
         if (!controller.signal.aborted) setSearching(false);
@@ -62,7 +63,7 @@ export default function EmployeeCustomers() {
   async function saveCustomer() {
     setError("");
     if (!/^07\d{8}$/.test(phone) || name.trim().length < 2 || address.trim().length < 5) {
-      setError("أدخل اسمًا من حرفين على الأقل ورقمًا يبدأ بـ07 وعنوانًا واضحًا.");
+      setError(userMessage("أدخل اسمًا من حرفين على الأقل ورقمًا يبدأ بـ07 وعنوانًا واضحًا."));
       return;
     }
     setSaving(true);
@@ -78,7 +79,7 @@ export default function EmployeeCustomers() {
       setShowForm(false);
       setName(""); setPhone(""); setAddress("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر تسجيل العميل.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذر تسجيل العميل."));
     } finally {
       setSaving(false);
     }
@@ -95,7 +96,7 @@ export default function EmployeeCustomers() {
           <div>
             <span className={styles.eyebrow}>محطة الفنار / العملاء</span>
             <h1>العملاء</h1>
-            <p>ابحث عن العميل، أو أضفه بسرعة وابدأ تسجيل طلبه.</p>
+
           </div>
           <div className={styles.headerButtons}>
             <button type="button" onClick={() => setShowForm((x) => !x)} className={styles.primary}>+ عميل جديد</button>
@@ -132,7 +133,7 @@ export default function EmployeeCustomers() {
               setSearching(false);
             }
           }} placeholder="اكتب حرفين أو رقمين على الأقل..." />
-          <small>النتائج تعرض بيانات التواصل والتوصيل فقط. سجل الطلبات والكوبونات متاح للإدارة وحدها.</small>
+
           {searching && <p className={styles.hint}>جاري البحث...</p>}
           {!searching && query.trim().length >= 2 && results.length === 0 && !error && (
             <div className={styles.empty}>ما لقينا عميل مطابق. بإمكانك إضافة عميل جديد.</div>

@@ -1,3 +1,5 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
+import { InventoryError } from "@/lib/inventory/stock-engine";
 import { NextResponse } from "next/server";
 
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
@@ -17,7 +19,7 @@ function failure(message: string, code: string, status: number) {
   );
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const store = await getStoreSecurityContext();
     const operator = await resolveOperatorSession(store.authUid);
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
       { status: 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    if (error instanceof DeliveryOrderBusinessError) {
+    if ((error instanceof DeliveryOrderBusinessError || error instanceof InventoryError)) {
       return failure(error.message, error.code, 409);
     }
     if (isSecurityError(error)) return toSecurityResponse(error);
@@ -84,3 +86,5 @@ export async function GET() {
     return failure("تعذر تحميل طلبات اليوم.", "INTERNAL_ERROR", 500);
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home"]);

@@ -415,7 +415,7 @@
   .shiftSettingsGrid,
   .timeGrid {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 
   .settingsFooter {

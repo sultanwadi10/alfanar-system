@@ -1,3 +1,4 @@
+import { customerSpecialDeliveryPrice } from "@/lib/customers/delivery-pricing";
 import { NextResponse } from "next/server";
 
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
@@ -23,8 +24,10 @@ function publicCustomer(customer: {
   name: string;
   phone: string;
   primaryAddress: string;
+  specialDelivery20LPriceFils?: number | null;
 }) {
   return {
+    specialDelivery20LPriceFils: customerSpecialDeliveryPrice(customer),
     id: customer.id,
     name: customer.name,
     phone: customer.phone,
@@ -64,6 +67,7 @@ export async function GET(request: Request) {
         return failure("العميل غير متاح.", "NOT_FOUND", 404);
       }
       const customer = publicCustomer({
+        specialDelivery20LPriceFils: customerSpecialDeliveryPrice(record),
         id: doc.id,
         name: record.name,
         phone: formatJordanPhoneLocal(record.phoneNormalized),
@@ -87,13 +91,14 @@ export async function GET(request: Request) {
     // For a larger database, replace the in-memory name filter with a search index.
     const snapshot = await getFirebaseAdminFirestore()
       .collection("customers")
-      .select("name", "phoneNormalized", "primaryAddress", "isArchived")
+      .select("name", "phoneNormalized", "primaryAddress", "isArchived", "specialDelivery20LPriceFils")
       .get();
     const customers = snapshot.docs.flatMap((doc) => {
       const data = doc.data();
       if (data.isArchived === true || typeof data.name !== "string" ||
           typeof data.phoneNormalized !== "string") return [];
       return [{
+        specialDelivery20LPriceFils: customerSpecialDeliveryPrice(data),
         id: doc.id,
         name: data.name as string,
         phone: formatJordanPhoneLocal(data.phoneNormalized as string),

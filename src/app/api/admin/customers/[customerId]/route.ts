@@ -122,6 +122,7 @@ export async function PATCH(
 
           adminNotes:
             parsed.data.adminNotes,
+          specialDelivery20LPriceFils: parsed.data.specialDelivery20LPriceFils,
 
           adminAuthUid:
             securityContext.authUid,

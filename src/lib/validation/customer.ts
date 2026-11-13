@@ -63,7 +63,7 @@ export const createCustomerSchema =
   z.object(customerFields);
 
 export const updateCustomerSchema =
-  z.object(customerFields);
+  z.object(customerFields).extend({specialDelivery20LPriceFils:z.number().int().min(0).max(10_000_000).nullable().optional()});
 
 export type CreateCustomerInput =
   z.infer<
@@ -91,17 +91,7 @@ export type UpdateCustomerInput =
         "لا يمكن إضافة أكثر من 22 كوبون في العملية.",
       ),
 
-    reason: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "اكتب سبب إضافة الكوبونات.",
-      )
-      .max(
-        200,
-        "سبب العملية طويل جدًا.",
-      ),
+    reason: z.string().trim().max(200).default("تسجيل كوبونات سابقة من الإدارة"),
   });
 
 export type CreditCustomerCouponsInput =

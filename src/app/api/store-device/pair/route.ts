@@ -44,7 +44,7 @@ function createHiddenResponse() {
         code:
           "NOT_FOUND",
         message:
-          "Not found.",
+          "غير متاح.",
       },
     },
     {
@@ -112,7 +112,7 @@ export async function POST(
               "PAIRING_FAILED",
 
             message:
-              "The access code is invalid or expired.",
+              "رمز الدخول غير صحيح أو انتهت صلاحيته.",
           },
         },
         {

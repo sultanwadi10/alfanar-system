@@ -1,10 +1,13 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlfanarIcon } from "@/components/admin/alfanar-icon";
 import styles from "./customer-booklet-wallet.module.css";
+import { newRequestId } from "@/lib/client/request-id";
 import ActionModal from "@/components/ui/action-modal";
 
 export type CustomerWalletData = {
@@ -23,7 +26,7 @@ export type CustomerWalletData = {
 };
 
 type StockItem = { id: string; serial: string; status: string };
-const stamp = (value: string | null) => value ? new Intl.DateTimeFormat("ar-JO", {
+const stamp = (value: string | null) => value ? new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Amman", dateStyle: "medium", timeStyle: "short",
 }).format(new Date(value)) : "—";
 const label = (status: string) => status === "ACTIVE" ? "نشط" : status === "EXHAUSTED" ? "مستهلك" : status === "IN_STOCK" ? "في المخزون" : status;
@@ -38,10 +41,17 @@ export function CustomerBookletWallet({ customerId, customerName, isArchived, da
   const [stock, setStock] = useState<StockItem[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [bookletId, setBookletId] = useState("");
-  const [reason, setReason] = useState("");
+  const [mode,setMode]=useState<"SALE"|"PREVIOUS">("SALE");
+  const [paymentMethod,setPaymentMethod]=useState<"CASH"|"CLICK">("CASH");
+  const [priceFils,setPriceFils]=useState<number|null>(null);
+  const [financialDate,setFinancialDate]=useState("");
+  const [period,setPeriod]=useState("");
+  const [confirmed,setConfirmed]=useState(false);
+  const [requestKey,setRequestKey]=useState({fingerprint:"",id:""});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  useTransientMessage(notice, setNotice);
   const active = data.booklets.filter(b => b.status === "ACTIVE" && b.remainingCoupons > 0);
   const remaining = active.reduce((sum, booklet) => sum + booklet.remainingCoupons, 0);
   const waiting = data.orders.filter(o => o.bookletRequestStatus === "REQUESTED" || o.bookletRequestStatus === "HANDED_OVER").length;
@@ -49,61 +59,63 @@ export function CustomerBookletWallet({ customerId, customerName, isArchived, da
 
   async function startAssignment() {
     if (isArchived) return;
-    setAssignOpen(true); setStockLoading(true); setError("");
+    setAssignOpen(true); setStockLoading(true); setStock([]);setPriceFils(null);setError(""); setBookletId("");setConfirmed(false);setMode("SALE");setRequestKey({fingerprint:"",id:""});
     try {
-      const response = await fetch("/api/admin/coupon-booklets", { cache: "no-store" });
+      const response = await fetch(`/api/admin/customers/${encodeURIComponent(customerId)}/booklets`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || result.success !== true) throw new Error(result?.error?.message ?? "تعذّر تحميل المخزون.");
-      setStock((result.data.booklets as StockItem[]).filter(b => b.status === "IN_STOCK"));
+      setStock(result.data.booklets);setPriceFils(result.data.priceFils);setFinancialDate(result.data.suggestion.workDay);setPeriod(result.data.suggestion.shiftType === "OTHER" ? "" : result.data.suggestion.shiftType);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذّر تحميل المخزون.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذّر تحميل المخزون."));
     } finally { setStockLoading(false); }
   }
 
   function beginAssign() {
-    if (busy || !bookletId || reason.trim().length < 5) { setError("اختر دفترًا واكتب سببًا واضحًا من 5 أحرف على الأقل."); return; }
-    if (!stock.some(b => b.id === bookletId)) { setError("الدفتر المختار لم يعد موجودًا في القائمة. حدّث المخزون."); return; }
+    if (busy || !bookletId || !confirmed || (mode === "SALE" && (!priceFils || !financialDate || !period))) {setError(userMessage("اختر الدفتر وأكمل بيانات البيع وتأكيد التسليم والتحصيل."));return;}
+    if (!stock.some(b => b.id === bookletId)) { setError(userMessage("الدفتر المختار لم يعد موجودًا في القائمة. حدّث المخزون.")); return; }
     setError("");
     setConfirmAssign(true);
   }
 
   async function assign() {
-    if (busy || !confirmAssign || !bookletId || reason.trim().length < 5) return;
+    if (busy || !confirmAssign || !bookletId || !confirmed) return;
     const selected = stock.find(b => b.id === bookletId);
     if (!selected) return;
     setBusy(true); setError("");
+    const fingerprint=JSON.stringify([bookletId,mode,paymentMethod,priceFils,financialDate,period]);
+    const requestId=requestKey.fingerprint===fingerprint?requestKey.id:newRequestId();setRequestKey({fingerprint,id:requestId});
     try {
       const response = await fetch(`/api/admin/customers/${encodeURIComponent(customerId)}/booklets`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookletId, reason: reason.trim() }),
+        body: JSON.stringify(mode === "SALE" ? {action:mode, bookletId,requestId,paymentMethod,expectedPriceFils:priceFils,financialDate,period,confirmed:true} : {action:mode,bookletId,confirmed:true}),
       });
       const result = await response.json();
       if (!response.ok || result.success !== true) throw new Error(result?.error?.message ?? "تعذّر إصدار الدفتر.");
       setNotice(`تم ربط الدفتر ${selected.serial} بالعميل بنجاح.`);
-      setConfirmAssign(false); setAssignOpen(false); setBookletId(""); setReason("");
+      setConfirmAssign(false); setAssignOpen(false); setBookletId(""); setConfirmed(false);
       router.refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "تعذّر إصدار الدفتر."); }
+    } catch (cause) { setError(userMessage(cause instanceof Error ? cause.message : "تعذّر إصدار الدفتر.")); }
     finally { setBusy(false); }
   }
 
   return <div className={styles.wrap} dir="rtl">
     <section className={styles.metrics} aria-label="ملخص محفظة العميل">
-      <article className={`${styles.metric} ${styles.blue}`}><span><AlfanarIcon name="book" /> الدفاتر النشطة</span><strong>{active.length}</strong><small>دفاتر مرتبطة بالعميل</small></article>
-      <article className={`${styles.metric} ${styles.green}`}><span><AlfanarIcon name="ticket" /> الكوبونات المتبقية</span><strong>{remaining}</strong><small>الرصيد الفعلي من الدفاتر فقط</small></article>
-      <article className={`${styles.metric} ${styles.blue}`}><span><AlfanarIcon name="truck" /> طلبات التوصيل</span><strong>{data.totalOrderCount}</strong><small>سجل الطلبات مرتبط بالعميل</small></article>
-      <article className={`${styles.metric} ${styles.amber}`}><span><AlfanarIcon name="clock" /> دفاتر بانتظار الاعتماد</span><strong>{waiting}</strong><small>طلبات لم تُعتمد أرقامها بعد</small></article>
+      <article className={`${styles.metric} ${styles.blue}`}><span><AlfanarIcon name="book" /> الدفاتر النشطة</span><strong>{active.length}</strong></article>
+      <article className={`${styles.metric} ${styles.green}`}><span><AlfanarIcon name="ticket" /> الكوبونات المتبقية</span><strong>{remaining}</strong></article>
+      <article className={`${styles.metric} ${styles.blue}`}><span><AlfanarIcon name="truck" /> طلبات التوصيل</span><strong>{data.totalOrderCount}</strong></article>
+      <article className={`${styles.metric} ${styles.amber}`}><span><AlfanarIcon name="clock" /> دفاتر بانتظار الاعتماد</span><strong>{waiting}</strong></article>
     </section>
 
     {notice && <p role="status" className={styles.success}>{notice}</p>}
     {error && !assignOpen && <p role="alert" className={styles.error}>{error}</p>}
-    {data.truncated && <p className={styles.note}>سجل العميل طويل؛ تفاصيل الدفاتر والحركات هنا تعرض أحدث النتائج فقط. إجمالي طلبات التوصيل محسوب بشكل مستقل.</p>}
+    {data.truncated && <p className={styles.note}>النتائج المعروضة جزئية.</p>}
 
     <section className={styles.panel}>
       <header className={styles.panelHeader}>
-        <div><p className={styles.eyebrow}>المحفظة الفعلية</p><h2><AlfanarIcon name="book" /> محفظة الدفاتر</h2><p>رصيد الكوبونات ناتج عن الدفاتر المرقّمة المفعّلة، كل دفتر يحوي 22 كوبونًا.</p></div>
+        <div><p className={styles.eyebrow}>المحفظة الفعلية</p><h2><AlfanarIcon name="book" /> محفظة الدفاتر</h2></div>
         <button className={styles.primary} onClick={() => void startAssignment()} disabled={isArchived}><AlfanarIcon name="plus" /> إضافة دفتر للعميل</button>
       </header>
-      <div className={styles.information}><AlfanarIcon name="info" /> الرقم التسلسلي هو المطبوع على الدفتر الفعلي. لا نفرض بادئة جديدة حاليًا؛ يمكن اعتماد تنسيق موحّد لاحقًا دون تغيير السجلات الموجودة.</div>
+
       {!data.booklets.length ? <div className={styles.empty}><AlfanarIcon name="book" /><strong>لا توجد دفاتر مرتبطة بهذا العميل</strong><span>يمكن إصدار دفتر موجود بالمخزون من الإدارة، أو اعتماده بعد توصيله.</span></div>
         : <div className={styles.booklets}>{data.booklets.map(b => {
           const percentage = Math.max(0, Math.min(100, (b.remainingCoupons / (b.issuedCoupons || 22)) * 100));
@@ -126,7 +138,7 @@ export function CustomerBookletWallet({ customerId, customerName, isArchived, da
     </section>
 
     <section className={styles.panel}>
-      <header className={styles.panelHeader}><div><p className={styles.eyebrow}>سجل تدقيقي</p><h2><AlfanarIcon name="activity" /> سجل حركة الكوبونات</h2><p>كل إصدار أو استهلاك مرتبط بدفتر فعلي؛ رقم الطلب يظهر مرجعًا للتدقيق فقط.</p></div></header>
+      <header className={styles.panelHeader}><div><p className={styles.eyebrow}>سجل تدقيقي</p><h2><AlfanarIcon name="activity" /> سجل حركة الكوبونات</h2></div></header>
       {!data.events.length ? <div className={styles.empty}><AlfanarIcon name="activity" /><strong>لا توجد حركات مسجلة بعد</strong></div> :
         <div className={styles.tableScroller}><table className={styles.ledger}><thead><tr><th>التاريخ والوقت</th><th>نوع الحركة</th><th>الكمية</th><th>الدفتر</th><th>رقم الطلب (للتدقيق)</th></tr></thead><tbody>{data.events.map(event => <tr key={event.id}>
           <td>{stamp(event.createdAt)}</td>
@@ -139,24 +151,26 @@ export function CustomerBookletWallet({ customerId, customerName, isArchived, da
 
     {assignOpen && <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !busy) setAssignOpen(false); }}><section role="dialog" aria-modal="true" aria-label="إضافة دفتر مرقّم للعميل" className={styles.modal}>
       <header><h2><AlfanarIcon name="plus" /> إصدار دفتر للعميل</h2><button className={styles.close} type="button" onClick={() => setAssignOpen(false)} disabled={busy} aria-label="إغلاق"><AlfanarIcon name="x" /></button></header>
-      <p>هذه عملية إصدار إداري وليست بيعًا نقديًا؛ لن يسجل النظام إيرادًا أو تحصيلًا. تأكد من وجود دفتر فعلي وتسليمه للعميل.</p>
+      <label>نوع العملية<select value={mode} disabled={busy} onChange={e=>{setMode(e.target.value as "SALE"|"PREVIOUS");setConfirmed(false);}}><option value="SALE">بيع دفتر في المحل</option><option value="PREVIOUS">ربط دفتر مدفوع سابقًا — دون تحصيل جديد</option></select></label>
+
+      {mode === "SALE" && <><p>سعر الدفتر: <strong>{priceFils ? (priceFils/1000).toFixed(3)+" د.أ" : "حدّد السعر في إدارة الدفاتر أولًا"}</strong></p><label>طريقة الدفع<select value={paymentMethod} disabled={busy} onChange={e=>setPaymentMethod(e.target.value as "CASH"|"CLICK")}><option value="CASH">كاش</option><option value="CLICK">كليك / تحويل</option></select></label><label>تاريخ البيع<input type="date" value={financialDate} disabled={busy} onChange={e=>setFinancialDate(e.target.value)} lang="en-GB"/></label><label>الفترة المالية<select value={period} disabled={busy} onChange={e=>setPeriod(e.target.value)}><option value="">اختر الفترة</option><option value="MORNING">صباحي</option><option value="EVENING">مسائي</option></select></label></>}
       <label>الدفتر الموجود بالمخزون<select value={bookletId} onChange={event => setBookletId(event.target.value)} disabled={busy || stockLoading}><option value="">{stockLoading ? "جاري التحميل..." : "اختر رقم الدفتر الفعلي"}</option>{stock.map(item => <option key={item.id} value={item.id}>{item.serial}</option>)}</select></label>
-      {!stockLoading && stock.length === 0 && <small>لا يظهر دفتر متاح ضمن أحدث السجلات. <Link href="/admin/coupons">إدارة المخزون</Link></small>}
-      <label>سبب الإصدار الإداري<textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={200} rows={3} placeholder="مثال: دفتر سبق تسليمه ولا يلزم تحصيل جديد" disabled={busy} /></label>
-      <div className={styles.modalActions}><button className={styles.primary} type="button" onClick={beginAssign} disabled={busy || !bookletId || reason.trim().length < 5}>{busy ? "جاري الاعتماد..." : "تأكيد إصدار 22 كوبونًا"}</button><button className={styles.secondary} type="button" disabled={busy} onClick={() => setAssignOpen(false)}>إلغاء</button></div>
+      {!stockLoading && stock.length === 0 && <small>لا توجد دفاتر متاحة. <Link href="/admin/coupons">إدارة المخزون</Link></small>}
+      <label className={styles.confirmation}><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/> أؤكد تسليم الدفتر الفعلي واستلام ثمنه{mode === "PREVIOUS" ? " وتسجيل تحصيله سابقًا" : ""}</label>
+      <div className={styles.modalActions}><button className={styles.primary} type="button" onClick={beginAssign} disabled={busy || !bookletId || !confirmed || (mode === "SALE" && (!priceFils || !period || !financialDate))}>{busy ? "جاري الاعتماد..." : "تأكيد إصدار 22 كوبونًا"}</button><button className={styles.secondary} type="button" disabled={busy} onClick={() => setAssignOpen(false)}>إلغاء</button></div>
       {error && <p className={styles.error} role="alert">{error}</p>}
     </section></div>}
     <ActionModal
       open={confirmAssign}
-      title="تأكيد إصدار دفتر من الإدارة"
-      description={`العميل: ${customerName}\nرقم الدفتر: ${stock.find(item => item.id === bookletId)?.serial ?? "—"}\nسيُمنح العميل 22 كوبونًا دون تسجيل إيراد أو قبض مالي. تأكد من أن الدفتر الفعلي سُلّم للعميل وأن سبب الإصدار صحيح.`}
+      title={mode === "SALE" ? "تأكيد بيع دفتر في المحل" : "ربط دفتر مدفوع سابقًا"}
+      description={`العميل: ${customerName}\nرقم الدفتر: ${stock.find(item => item.id === bookletId)?.serial ?? "—"}\n${mode === "SALE" ? `التحصيل: ${((priceFils??0)/1000).toFixed(3)} د.أ — ${paymentMethod === "CASH" ? "كاش" : "كليك"}\n${financialDate} — ${period === "MORNING" ? "صباحي" : "مسائي"}` : "لا يسجل تحصيلًا جديدًا."}\nيضيف 22 كوبونًا.`}
       tone="warning"
       busy={busy}
-      confirmLabel="اعتماد الإصدار الإداري"
+      confirmLabel={mode === "SALE" ? "تأكيد البيع والتحصيل" : "اعتماد الربط السابق"}
       onClose={() => { if (!busy) setConfirmAssign(false); }}
       onConfirm={() => void assign()}
     >
-      <p><strong>سبب الإصدار:</strong> {reason.trim()}</p>
+
       {error && <p role="alert" style={{ color: "#e15b61", fontWeight: 800 }}>{error}</p>}
     </ActionModal>
   </div>;

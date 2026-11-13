@@ -10,6 +10,7 @@ export type CustomerCreatedSource =
   (typeof CUSTOMER_CREATED_SOURCES)[keyof typeof CUSTOMER_CREATED_SOURCES];
 
 export type Customer = {
+  specialDelivery20LPriceFils?: number | null;
   id: string;
 
   name: string;
@@ -41,6 +42,7 @@ export type Customer = {
 };
 
 export type CustomerRecord = {
+  specialDelivery20LPriceFils?: number | null;
   name: string;
 
   phoneNormalized: string;

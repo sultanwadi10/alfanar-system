@@ -900,7 +900,7 @@
 
 @media (max-width: 900px) {
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .customersHeader {
@@ -957,7 +957,7 @@
     display: grid;
 
     grid-template-columns:
-      1fr 1fr;
+      minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -1194,3 +1194,10 @@
   color:
     var(--color-danger);
 }
+/* Responsive viewport containment. */
+
+.modalBackdrop { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.modalBackdrop { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.modal { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.modal > * { min-width: 0; }
+@media (max-width: 600px) { .modal { padding: 18px 14px; border-radius: 16px; } }

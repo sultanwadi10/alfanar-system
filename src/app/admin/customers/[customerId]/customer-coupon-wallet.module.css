@@ -144,7 +144,7 @@
   display: grid;
 
   grid-template-columns:
-    minmax(110px, 0.4fr)
+    minmax(110px, minmax(0, 0.4fr))
     minmax(0, 1fr);
 
   gap: 12px;
@@ -431,7 +431,7 @@
 
 @media (max-width: 560px) {
   .formGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .transactionTop {

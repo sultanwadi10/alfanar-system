@@ -1,20 +1,20 @@
 .page,
 .storePage {
-  --store-bg: #eaf2f7;
-  --store-surface: #f7fafc;
-  --store-surface-2: #eef4f8;
-  --store-surface-3: #e4eef5;
-  --store-text: #142433;
-  --store-muted: #62788a;
-  --store-border: #cfdde7;
-  --store-primary: #2563eb;
-  --store-primary-hover: #1d4ed8;
+  --store-bg: var(--store-ui-bg, #eaf2f7);
+  --store-surface: var(--store-ui-card, #f7fafc);
+  --store-surface-2: var(--store-ui-soft, #eef4f8);
+  --store-surface-3: var(--store-ui-soft, #e4eef5);
+  --store-text: var(--store-ui-text, #142433);
+  --store-muted: var(--store-ui-muted, #62788a);
+  --store-border: var(--store-ui-border, #cfdde7);
+  --store-primary: var(--store-ui-primary, #2563eb);
+  --store-primary-hover: var(--store-ui-primary-hover, #1d4ed8);
   --store-primary-dark: #123a63;
-  --store-primary-soft: #e8f0ff;
-  --store-danger: #b91c1c;
-  --store-danger-bg: #fee2e2;
-  --store-success: #15803d;
-  --store-success-bg: #dcfce7;
+  --store-primary-soft: var(--store-ui-soft-blue, #e8f0ff);
+  --store-danger: var(--store-ui-danger, #b91c1c);
+  --store-danger-bg: var(--store-ui-danger-bg, #fee2e2);
+  --store-success: var(--store-ui-success, #15803d);
+  --store-success-bg: var(--store-ui-success-bg, #dcfce7);
   --store-warning: #9a6700;
   --store-warning-bg: #fff7d6;
   --store-shadow:
@@ -27,21 +27,21 @@
 
 :global(html[data-theme="dark"]) .page,
 :global(html[data-theme="dark"]) .storePage {
-  --store-bg: #0d1722;
-  --store-surface: #162534;
-  --store-surface-2: #1b2c3c;
-  --store-surface-3: #213548;
-  --store-text: #f1f5f9;
-  --store-muted: #a9bbc9;
-  --store-border: #2a4053;
-  --store-primary: #60a5fa;
-  --store-primary-hover: #3b82f6;
+  --store-bg: var(--store-ui-bg, #0d1722);
+  --store-surface: var(--store-ui-card, #162534);
+  --store-surface-2: var(--store-ui-soft, #1b2c3c);
+  --store-surface-3: var(--store-ui-soft, #213548);
+  --store-text: var(--store-ui-text, #f1f5f9);
+  --store-muted: var(--store-ui-muted, #a9bbc9);
+  --store-border: var(--store-ui-border, #2a4053);
+  --store-primary: var(--store-ui-primary, #60a5fa);
+  --store-primary-hover: var(--store-ui-primary-hover, #3b82f6);
   --store-primary-dark: #123a63;
-  --store-primary-soft: #162e49;
-  --store-danger: #fca5a5;
-  --store-danger-bg: #442326;
-  --store-success: #86efac;
-  --store-success-bg: #163b2a;
+  --store-primary-soft: var(--store-ui-soft-blue, #162e49);
+  --store-danger: var(--store-ui-danger, #fca5a5);
+  --store-danger-bg: var(--store-ui-danger-bg, #442326);
+  --store-success: var(--store-ui-success, #86efac);
+  --store-success-bg: var(--store-ui-success-bg, #163b2a);
   --store-warning: #fcd34d;
   --store-warning-bg: #3e351e;
   --store-shadow:
@@ -207,7 +207,7 @@
   display: grid;
   place-items: center;
   border-radius: 15px;
-  background: var(--store-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
   font-size: 1.15rem;
   font-weight: 900;
@@ -272,7 +272,7 @@
   margin-top: 20px;
   border: 0;
   border-radius: 13px;
-  background: var(--store-primary);
+  background: var(--store-ui-button, #0964ec);
   color: #ffffff;
   cursor: pointer;
   font: inherit;
@@ -989,7 +989,7 @@
 
   .operationGrid {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 }
 
@@ -998,7 +998,7 @@
 ) {
   .employeeGrid {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 
   .operatorIdentity {
@@ -1021,7 +1021,7 @@
 
   .modalActions {
     grid-template-columns:
-      1fr;
+      minmax(0, 1fr);
   }
 
   .cancelButton {
@@ -1045,3 +1045,21 @@
       none;
   }
 }
+/* Responsive viewport containment. */
+
+.modalOverlay { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.modalOverlay { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.closeShiftModal { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
+.closeShiftModal > * { min-width: 0; }
+@media (max-width: 600px) { .closeShiftModal { padding: 18px 14px; border-radius: 16px; } }
+
+
+/* Responsive viewport containment. */
+
+.closeShiftModal { justify-self: center; }
+.modalTitle h2 { font-size: clamp(20px, 5vw, 26px); line-height: 1.5; overflow-wrap: anywhere; }
+.cashInputWrap { width: 100%; min-width: 0; }
+.cashInputWrap input { width: 100%; flex: 1 1 0; }
+.cashInputWrap strong, .confirmCheck input { flex: none; }
+.confirmCheck span { min-width: 0; }
+.confirmCloseButton, .cancelButton { white-space: normal; line-height: 1.5; padding-block: 12px; }

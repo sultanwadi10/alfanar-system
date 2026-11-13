@@ -1,6 +1,12 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useOperationChanges } from "@/lib/client/operation-changes";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { BottleReturnFields, PreviousBottleReturnFields, bottleReturnsComplete, type BottleRequirement } from "@/components/store/bottle-return-fields";
+import { CustomerContactActions } from "@/components/store/customer-contact-actions";
+import type { BottleReturn } from "@/types/inventory";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./orders-today.module.css";
 import ActionModal from "@/components/ui/action-modal";
@@ -9,8 +15,12 @@ type OrderStatus = "NEW" | "READY" | "DELIVERED" | "CANCELLED";
 type PaymentMethod = "CASH" | "CLICK" | "COUPON";
 
 type TodayOrder = {
+  returnRequirements?: Array<{ itemId: string; label: string; quantity: number }>;
+  bottleReturns?: BottleReturn[];
+  previousBottleReturns?: Array<BottleReturn & { label: string }>;
   id: string;
   number: string;
+  source?: "ADMIN" | "EMPLOYEE";
   status: OrderStatus;
   customer: { name: string; phone: string; address: string };
   notes: string;
@@ -24,6 +34,9 @@ type TodayOrder = {
   itemCount: number;
   totalFils: number;
   paymentMethod: PaymentMethod;
+  paymentState: string;
+  pendingCouponQuantity: number;
+  collectedFils: number;
   bookletRequestStatus: string | null;
   createdAt: string;
   readyAt: string | null;
@@ -50,16 +63,9 @@ function formatMoney(fils: number) {
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat("ar-JO", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Amman", hour: "numeric", minute: "2-digit",
   }).format(new Date(value));
-}
-
-function readablePhone(phone: string) {
-  if (phone.startsWith("+9627") && phone.length === 13) {
-    return `0${phone.slice(4)}`;
-  }
-  return phone;
 }
 
 function apiError(data: unknown) {
@@ -74,9 +80,13 @@ function apiError(data: unknown) {
 
 export default function OrdersToday() {
   const router = useRouter();
+  const [bottleReturns, setBottleReturns] = useState<BottleReturn[]>([]);
+  const [previousBottleReturns, setPreviousBottleReturns] = useState<BottleReturn[]>([]);
+  const [previousDebts, setPreviousDebts] = useState<{ orderId: string; rows: BottleRequirement[]; loading: boolean; error: string } | null>(null);
+  const debtRequest = useRef(0);
   const [orders, setOrders] = useState<TodayOrder[]>([]);
   const [bookletPriceFils, setBookletPriceFils] = useState<number | null>(null);
-  const [day, setDay] = useState("");
+  const [, setDay] = useState("");
   const [limitReached, setLimitReached] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,6 +100,7 @@ export default function OrdersToday() {
     kind: "STATUS" | "BOOKLET";
     action?: "READY" | "DELIVERED" | "CANCELLED";
   } | null>(null);
+  const [paymentChoice,setPaymentChoice]=useState<"PAID"|"DUE"|null>(null);
   const [bookletPayment, setBookletPayment] = useState<"CASH" | "CLICK" | null>(null);
 
   const loadOrders = useCallback(async (quiet = false) => {
@@ -107,7 +118,7 @@ export default function OrdersToday() {
       setError("");
       setSelectedId((previous) => previous && nextOrders.some((order) => order.id === previous) ? previous : null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر تحميل طلبات اليوم.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذر تحميل طلبات اليوم."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -121,17 +132,9 @@ export default function OrdersToday() {
       void loadOrders();
     }, 0);
 
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadOrders(true);
-      }
-    }, 20000);
-
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
+    return () => window.clearTimeout(initialTimer);
   }, [loadOrders]);
+  useOperationChanges(["orders", "catalog"], () => { void loadOrders(true); }, !busyId && !actionDialog);
 
   const counts = useMemo(() => ({
     NEW: orders.filter((order) => order.status === "NEW").length,
@@ -152,14 +155,34 @@ export default function OrdersToday() {
 
   const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
 
+  async function loadPreviousDebts(orderId: string) {
+    const token = ++debtRequest.current;
+    setPreviousBottleReturns([]);
+    setPreviousDebts({ orderId, rows: [], loading: true, error: "" });
+    try {
+      const response = await fetch(`/api/operator/delivery-orders/${encodeURIComponent(orderId)}/bottle-returns`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw Error(apiError(result));
+      if (token === debtRequest.current) setPreviousDebts({ orderId, rows: result.data, loading: false, error: "" });
+    } catch (cause) {
+      if (token === debtRequest.current) setPreviousDebts({ orderId, rows: [], loading: false, error: cause instanceof Error ? cause.message : "تعذر تحميل العهدة السابقة." });
+    }
+  }
   function changeStatus(order: TodayOrder, action: "READY" | "DELIVERED" | "CANCELLED") {
     if (busyId) return;
     setError("");
+    setPaymentChoice(null);
+    setBottleReturns([]);
+    setPreviousBottleReturns([]); setPreviousDebts(null); ++debtRequest.current;
+    if (action === "DELIVERED" && (order.returnRequirements ?? []).length) void loadPreviousDebts(order.id);
     setActionDialog({ kind: "STATUS", action, orderId: order.id });
   }
 
   async function executeStatus(order: TodayOrder, action: "READY" | "DELIVERED" | "CANCELLED") {
     if (busyId) return;
+    if(action === "DELIVERED" && order.paymentMethod !== "COUPON" && !paymentChoice) { setError(userMessage("اختر حالة التحصيل.")); return; }
+    if (action === "DELIVERED" && (order.returnRequirements ?? []).some(r => !bottleReturns.some(v => v.itemId === r.itemId && Number.isInteger(v.quantity) && v.quantity >= 0 && v.quantity <= r.quantity))) { setError(userMessage("سجّل الفارغ المستلم لكل نوع أو أكّد استلام الكل.")); return; }
+    if (action === "DELIVERED" && (previousDebts?.loading || previousBottleReturns.some(row => !Number.isSafeInteger(row.quantity) || row.quantity < 1 || row.quantity > (previousDebts?.rows.find(d => d.itemId === row.itemId)?.quantity ?? 0)))) { setError(userMessage("راجع عدد الفارغ السابق أو انتظر تحميل العهدة.")); return; }
     setBusyId(order.id);
     setError("");
     try {
@@ -168,7 +191,7 @@ export default function OrdersToday() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, paymentCollected: action === "DELIVERED" && order.paymentMethod !== "COUPON" }),
+          body: JSON.stringify({ action, ...(action === "DELIVERED" ? { bottleReturns, previousBottleReturns } : {}), paymentCollected: action === "DELIVERED" && order.paymentMethod !== "COUPON" && paymentChoice === "PAID", paymentDeferred: action === "DELIVERED" && order.paymentMethod !== "COUPON" && paymentChoice === "DUE" }),
         },
       );
       const data = await response.json();
@@ -176,7 +199,7 @@ export default function OrdersToday() {
       setActionDialog(null);
       await loadOrders(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر تحديث الطلب.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذر تحديث الطلب."));
     } finally {
       setBusyId(null);
     }
@@ -185,7 +208,7 @@ export default function OrdersToday() {
   function confirmBooklet(order: TodayOrder) {
     if (busyId || order.status !== "DELIVERED" || order.bookletRequestStatus !== "REQUESTED") return;
     if (bookletPriceFils === null) {
-      setError("سعر دفتر الكوبونات غير محدد. اطلب من الإدارة تحديد السعر أولًا.");
+      setError(userMessage("سعر دفتر الكوبونات غير محدد. اطلب من الإدارة تحديد السعر أولًا."));
       return;
     }
     setBookletPayment(null);
@@ -209,7 +232,7 @@ export default function OrdersToday() {
       setBookletPayment(null);
       await loadOrders(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذّر تأكيد تسليم الدفتر.");
+      setError(userMessage(cause instanceof Error ? cause.message : "تعذّر تأكيد تسليم الدفتر."));
     } finally {
       setBusyId(null);
     }
@@ -217,21 +240,24 @@ export default function OrdersToday() {
 
   const dialogOrder = orders.find((order) => order.id === actionDialog?.orderId) ?? null;
   const dialogAction = actionDialog?.action;
+  const activePrevious = previousDebts?.orderId === dialogOrder?.id ? previousDebts : null;
+  const currentComplete = bottleReturnsComplete(dialogOrder?.returnRequirements ?? [], bottleReturns);
+  const previousValid = previousBottleReturns.every(row => Number.isSafeInteger(row.quantity) && row.quantity > 0 && row.quantity <= (activePrevious?.rows.find(d => d.itemId === row.itemId)?.quantity ?? 0));
   const dialogTitle = actionDialog?.kind === "BOOKLET"
     ? "تسليم دفتر الكوبونات وتحصيل ثمنه"
     : dialogAction === "READY" ? "تأكيد تجهيز الطلب"
-    : dialogAction === "DELIVERED" ? "تأكيد تسليم الطلب والتحصيل"
+    : dialogAction === "DELIVERED" ? "تأكيد تسليم الطلب"
     : "إلغاء طلب التوصيل";
   const dialogDescription = !dialogOrder ? ""
     : actionDialog?.kind === "BOOKLET"
-      ? `العميل: ${dialogOrder.customer.name}\nثمن دفتر الـ22 كوبون: ${bookletPriceFils === null ? "غير محدد" : formatMoney(bookletPriceFils)}.\nاختر طريقة التحصيل، ثم أكد أنك سلّمت الدفتر فعليًا وقبضت الثمن. رقم الدفتر سيُعتمد لاحقًا من الإدارة.`
+      ? `العميل: ${dialogOrder.customer.name}\nثمن دفتر الـ22 كوبون: ${bookletPriceFils === null ? "غير محدد" : formatMoney(bookletPriceFils)}.\nتأكيد تسليم الدفتر وقبض ثمنه.`
       : dialogAction === "READY"
-        ? `هل تم تجهيز الطلب #${dialogOrder.number} بالكامل؟\nسينتقل الطلب إلى حالة «جاهز للتوصيل».`
+        ? `هل تم تجهيز الطلب #${dialogOrder.number} بالكامل؟`
         : dialogAction === "DELIVERED"
           ? dialogOrder.paymentMethod === "COUPON"
-            ? `هل تم تسليم الطلب #${dialogOrder.number} فعليًا؟\nسيُعتمد استهلاك الكوبونات المحجوزة فقط، وتبقى أي كوبونات مؤجّلة بانتظار اعتماد الإدارة.`
-            : `هل تم تسليم الطلب #${dialogOrder.number} وقبض ${formatMoney(dialogOrder.totalFils)} بطريقة «${payments[dialogOrder.paymentMethod]}» فعليًا؟\nسيُسجّل التحصيل بالشفت مرة واحدة بعد تأكيدك.`
-          : `هل تريد إلغاء الطلب #${dialogOrder.number}؟\nسيتم تحرير أي كوبونات محجوزة، ولن يمكن إرجاع الحالة تلقائيًا.`;
+            ? `هل تم تسليم الطلب #${dialogOrder.number} فعليًا؟`
+            : `هل استلم العميل الطلب #${dialogOrder.number} فعليًا؟`
+          : `هل تريد إلغاء الطلب #${dialogOrder.number}؟`;
 
   return (
     <main className={styles.page} dir="rtl">
@@ -240,7 +266,7 @@ export default function OrdersToday() {
           <div>
             <span className={styles.eyebrow}>محطة الفنار / إدارة التوصيل</span>
             <h1>طلبات اليوم</h1>
-            <p>من تجهيز الطلبات إلى تسليمها. التحديث تلقائي كل 20 ثانية أثناء فتح الصفحة.</p>
+
           </div>
           <div className={styles.headerActions}>
             <button type="button" onClick={() => void loadOrders(true)} disabled={refreshing || loading}>
@@ -283,14 +309,14 @@ export default function OrdersToday() {
           ) : filtered.length === 0 ? (
             <div className={styles.empty}>
               <strong>ما في طلبات مطابقة</strong>
-              <p>جرّب تغيير الفلتر أو تسجيل أول طلب توصيل.</p>
+              <p>لا توجد طلبات مطابقة.</p>
             </div>
           ) : (
             <div className={styles.cards}>
               {filtered.map((order) => (
                 <article key={order.id} className={styles.card}>
                   <div className={styles.cardHead}>
-                    <div><span className={styles.number}>#{order.number}</span><small>{formatTime(order.createdAt)}</small></div>
+                    <div><span className={styles.number}>#{order.number}</span><small>{formatTime(order.createdAt)}</small>{order.source === "ADMIN" && <small>من الإدارة</small>}</div>
                     <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{labels[order.status]}</span>
                   </div>
                   <h2>{order.customer.name}</h2>
@@ -300,8 +326,10 @@ export default function OrdersToday() {
                     <span>{payments[order.paymentMethod]}</span>
                     <strong>{formatMoney(order.totalFils)}</strong>
                   </div>
+                  {order.status === "DELIVERED" && order.pendingCouponQuantity>0 && <p className={styles.bookletNote}>مستحق: {order.pendingCouponQuantity} كوبون</p>}
+                  {order.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(order.paymentState) && <p className={styles.bookletNote}>المتبقي: {formatMoney(order.totalFils-order.collectedFils)}</p>}
                   {order.bookletRequestStatus && order.bookletRequestStatus !== "CANCELLED" && (
-                    <p className={styles.bookletNote}>دفتر جديد مطلوب — تأكيد بيع الدفتر واعتماد رقمه سيتمان في مرحلة الإدارة التالية، ولم يُحتسب ثمنه الآن.</p>
+                    <p className={styles.bookletNote}>دفتر جديد مطلوب — بانتظار التسليم والاعتماد.</p>
                   )}
                   <div className={styles.buttons}>
                     <button type="button" onClick={() => setSelectedId(order.id)}>التفاصيل</button>
@@ -314,7 +342,7 @@ export default function OrdersToday() {
               ))}
             </div>
           )}
-          <p className={styles.footerNote}>تظهر طلبات تاريخ {day ? `${day.slice(0, 4)}/${day.slice(4, 6)}/${day.slice(6, 8)}` : "اليوم"} فقط بتوقيت الأردن. سجل الطلبات السابق خاص بالإدارة.</p>
+
         </section>
       </div>
 
@@ -334,7 +362,7 @@ export default function OrdersToday() {
               <h3>الزبون والتوصيل</h3>
               <strong>{selectedOrder.customer.name}</strong>
               <p>{selectedOrder.customer.address}</p>
-              <a href={`tel:${selectedOrder.customer.phone}`}>اتصال: {readablePhone(selectedOrder.customer.phone)}</a>
+              <CustomerContactActions phone={selectedOrder.customer.phone} customerName={selectedOrder.customer.name}/>
             </div>
             <div className={styles.detailSection}>
               <h3>الأصناف المطلوبة</h3>
@@ -350,11 +378,15 @@ export default function OrdersToday() {
               <h3>الدفع والملاحظات</h3>
               <p>طريقة الدفع: <strong>{payments[selectedOrder.paymentMethod]}</strong></p>
               <p>{selectedOrder.notes || "لا توجد ملاحظات."}</p>
-              {selectedOrder.bookletRequestStatus && <p className={styles.bookletNote}>حالة الدفتر: {selectedOrder.bookletRequestStatus === "HANDED_OVER" ? "تم البيع والتسليم وبانتظار اعتماد الإدارة" : selectedOrder.bookletRequestStatus === "APPROVED" ? "تم اعتماد الدفتر من الإدارة" : "دفتر جديد مطلوب — لا يتم اعتماده إلا من الإدارة بعد تسليمه وبيعه فعليًا"}. {selectedOrder.bookletRequestStatus === "REQUESTED" && bookletPriceFils !== null ? `سعر الدفتر ${formatMoney(bookletPriceFils)}.` : ""}</p>}
+              {selectedOrder.bookletRequestStatus && <p className={styles.bookletNote}>حالة الدفتر: {selectedOrder.bookletRequestStatus === "HANDED_OVER" ? "تم البيع والتسليم وبانتظار اعتماد الإدارة" : selectedOrder.bookletRequestStatus === "APPROVED" ? "تم اعتماد الدفتر من الإدارة" : "دفتر جديد مطلوب — بانتظار التسليم"}. {selectedOrder.bookletRequestStatus === "REQUESTED" && bookletPriceFils !== null ? `سعر الدفتر ${formatMoney(bookletPriceFils)}.` : ""}</p>}
             </div>
+            {selectedOrder.status === "DELIVERED" && (selectedOrder.returnRequirements ?? []).length > 0 && <div className={styles.detailSection}><h3>الفارغ المسجل عند التسليم</h3>{selectedOrder.returnRequirements!.map(row => <p key={row.itemId}>{row.label}: استلمنا {selectedOrder.bottleReturns?.find(v => v.itemId === row.itemId)?.quantity ?? 0} من {row.quantity}</p>)}</div>}
+            {!!selectedOrder.previousBottleReturns?.length && <div className={styles.detailSection}><h3>فوارغ سابقة استُلمت مع الطلب</h3>{selectedOrder.previousBottleReturns.map(r => <p key={r.itemId}>{r.label}: {r.quantity}</p>)}</div>}
             <div className={styles.detailActions}>
+              {selectedOrder.status === "DELIVERED" && selectedOrder.pendingCouponQuantity>0 && <p role="status">مستحق: {selectedOrder.pendingCouponQuantity} كوبون</p>}
+              {selectedOrder.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(selectedOrder.paymentState) && <p role="status">المتبقي: {formatMoney(selectedOrder.totalFils-selectedOrder.collectedFils)}</p>}
               {selectedOrder.status === "NEW" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "READY")}>تأكيد تجهيز الطلب</button>}
-              {selectedOrder.status === "READY" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "DELIVERED")}>تأكيد التسليم والتحصيل</button>}
+              {selectedOrder.status === "READY" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "DELIVERED")}>تأكيد التسليم</button>}
               {selectedOrder.status === "DELIVERED" && selectedOrder.bookletRequestStatus === "REQUESTED" && <button type="button" disabled={busyId !== null} onClick={() => void confirmBooklet(selectedOrder)}>تأكيد تسليم الدفتر وقبض ثمنه</button>}
               {selectedOrder.status === "NEW" && <button type="button" className={styles.cancelButton} disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "CANCELLED")}>إلغاء الطلب</button>}
             </div>
@@ -368,14 +400,14 @@ export default function OrdersToday() {
         tone={actionDialog?.kind === "BOOKLET" ? "warning" : dialogAction === "CANCELLED" ? "danger" : dialogAction === "DELIVERED" ? "success" : "info"}
         busy={busyId !== null}
         confirmLabel={actionDialog?.kind === "BOOKLET" ? "تأكيد التسليم والتحصيل" : dialogAction === "READY" ? "اعتماد التجهيز" : dialogAction === "DELIVERED" ? "تأكيد التسليم" : "تأكيد الإلغاء"}
-        confirmDisabled={actionDialog?.kind === "BOOKLET" && !bookletPayment}
+        confirmDisabled={actionDialog?.kind === "BOOKLET" ? !bookletPayment : dialogAction === "DELIVERED" && ((dialogOrder?.paymentMethod !== "COUPON" && !paymentChoice) || !currentComplete || !previousValid || activePrevious?.loading === true)}
         choices={actionDialog?.kind === "BOOKLET" ? [
           { value: "CASH", label: "كاش", description: "تحصيل نقدي" },
           { value: "CLICK", label: "كليك", description: "تحصيل إلكتروني" },
         ] : undefined}
         selectedChoice={bookletPayment}
         onChoiceChange={(value) => setBookletPayment(value === "CASH" ? "CASH" : "CLICK")}
-        onClose={() => { if (busyId === null) { setActionDialog(null); setError(""); } }}
+        onClose={() => { if (busyId === null) { ++debtRequest.current; setActionDialog(null); setError(""); } }}
         onConfirm={() => {
           if (!dialogOrder || !actionDialog) return;
           if (actionDialog.kind === "BOOKLET") {
@@ -385,6 +417,15 @@ export default function OrdersToday() {
           }
         }}
       >
+        {dialogAction === "DELIVERED" && dialogOrder && <fieldset disabled={busyId!==null} style={{display:"grid",gap:14,padding:16,border:"1px solid var(--color-border)",borderRadius:14}}><legend>التحصيل عند التسليم</legend>{dialogOrder.paymentMethod === "COUPON" ? <p>{dialogOrder.pendingCouponQuantity>0 ? "المتبقي على العميل: "+dialogOrder.pendingCouponQuantity+" كوبون" : "الكوبونات متوفرة للطلب"}</p> : <><label><input type="radio" name="collection" checked={paymentChoice==="PAID"} onChange={()=>setPaymentChoice("PAID")}/> تم استلام {formatMoney(dialogOrder.totalFils)} — {payments[dialogOrder.paymentMethod]}</label><label><input type="radio" name="collection" checked={paymentChoice==="DUE"} onChange={()=>setPaymentChoice("DUE")}/> تم تسليم الطلب والمبلغ باقي على العميل</label></>}</fieldset>}
+        {dialogAction === "DELIVERED" && dialogOrder && (dialogOrder.returnRequirements ?? []).length > 0 && <>
+          <BottleReturnFields key={dialogOrder.id} requirements={dialogOrder.returnRequirements ?? []} value={bottleReturns} onChange={setBottleReturns} disabled={busyId !== null}/>
+          {activePrevious?.loading && <p role="status">جارٍ تحميل العهدة السابقة…</p>}
+          {activePrevious?.error && <div role="status"><p>{activePrevious.error} تسوية العهدة السابقة غير متاحة حاليًا.</p><button type="button" disabled={busyId !== null} onClick={() => void loadPreviousDebts(dialogOrder.id)}>إعادة تحميل العهدة</button></div>}
+          {activePrevious && !activePrevious.loading && !activePrevious.error && <PreviousBottleReturnFields key={dialogOrder.id+"previous"} debts={activePrevious.rows} value={previousBottleReturns} onChange={setPreviousBottleReturns} disabled={busyId !== null}/>}
+          {!previousValid && <p role="alert">عدد الفارغ السابق يجب أن يكون ضمن العهدة المسجلة.</p>}
+          {currentComplete && previousValid && activePrevious && !activePrevious.loading && !activePrevious.error && activePrevious.rows.length > 0 && <p role="status" style={{ fontWeight: 800, lineHeight: 1.8 }}>إجمالي الفارغ المستلم: {bottleReturns.reduce((sum, r) => sum + r.quantity, 0) + previousBottleReturns.reduce((sum, r) => sum + r.quantity, 0)}. العهدة المتبقية بعد التسليم: {activePrevious.rows.reduce((sum, r) => sum + r.quantity, 0) - previousBottleReturns.reduce((sum, r) => sum + r.quantity, 0) + (dialogOrder.returnRequirements ?? []).reduce((sum, r) => sum + r.quantity, 0) - bottleReturns.reduce((sum, r) => sum + r.quantity, 0)} قارورة.</p>}
+        </>}
         {error && <p role="alert" style={{ color: "#e15b61", fontWeight: 800 }}>{error}</p>}
       </ActionModal>
     </main>

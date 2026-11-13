@@ -1,4 +1,6 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
+import { useTransientMessage } from "@/lib/client/use-transient-message";
 
 import {
   type FormEvent,
@@ -47,8 +49,7 @@ export function CustomerCouponWallet({
   const [amount, setAmount] =
     useState("1");
 
-  const [reason, setReason] =
-    useState("");
+  const reason = "تسجيل كوبونات سابقة من الإدارة";
 
   const [loading, setLoading] =
     useState(false);
@@ -62,6 +63,7 @@ export function CustomerCouponWallet({
     successMessage,
     setSuccessMessage,
   ] = useState("");
+  useTransientMessage(successMessage, setSuccessMessage);
 
   const remainingCapacity =
     Math.max(
@@ -84,7 +86,7 @@ export function CustomerCouponWallet({
       parsedAmount < 1
     ) {
       setErrorMessage(
-        "أدخل عدد كوبونات صحيح.",
+        userMessage("أدخل عدد كوبونات صحيح."),
       );
 
       return;
@@ -124,8 +126,8 @@ export function CustomerCouponWallet({
         data.success !== true
       ) {
         setErrorMessage(
-          data?.error?.message ??
-            "تعذر إضافة الكوبونات.",
+          userMessage(data?.error?.message ??
+            "تعذر إضافة الكوبونات."),
         );
 
         return;
@@ -137,12 +139,12 @@ export function CustomerCouponWallet({
 
       setAmount("1");
 
-      setReason("");
+
 
       router.refresh();
     } catch {
       setErrorMessage(
-        "حدث خطأ أثناء الاتصال بالخدمة.",
+        userMessage("تعذّر الاتصال. حاول مجددًا."),
       );
     } finally {
       setLoading(false);
@@ -163,10 +165,7 @@ export function CustomerCouponWallet({
             محفظة الكوبونات
           </h2>
 
-          <p>
-            إدارة رصيد العميل
-            ومراجعة سجل الحركات.
-          </p>
+
         </div>
 
         <div
@@ -257,34 +256,11 @@ export function CustomerCouponWallet({
                   remainingCapacity ===
                     0
                 }
-                required
+                required lang="en-GB"
               />
             </label>
 
-            <label>
-              سبب الإضافة
 
-              <input
-                type="text"
-                value={reason}
-                onChange={(
-                  event,
-                ) =>
-                  setReason(
-                    event.target
-                      .value,
-                  )
-                }
-                placeholder="مثال: شحن محفظة العميل"
-                maxLength={200}
-                disabled={
-                  loading ||
-                  remainingCapacity ===
-                    0
-                }
-                required
-              />
-            </label>
           </div>
 
           {errorMessage && (

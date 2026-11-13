@@ -1,3 +1,5 @@
+import { withOperationChanges } from "@/lib/updates/operation-changes";
+import { InventoryError } from "@/lib/inventory/stock-engine";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -12,6 +14,9 @@ import { toSecurityResponse } from "@/lib/security/to-security-response";
 const schema = z.object({
   action: z.enum(["READY", "DELIVERED", "CANCELLED"]),
   paymentCollected: z.boolean().optional(),
+  paymentDeferred: z.boolean().optional(),
+  previousBottleReturns: z.array(z.object({ itemId: z.string().regex(/^[A-Za-z0-9_-]{1,150}$/), quantity: z.number().int().min(1).max(100000) }).strict()).max(30).optional(),
+  bottleReturns: z.array(z.object({ itemId: z.string().regex(/^[A-Za-z0-9_-]{1,150}$/), quantity: z.number().int().min(0).max(100000) }).strict()).max(30).optional(),
 }).strict();
 
 function fail(message: string, code: string, status: number) {
@@ -21,7 +26,7 @@ function fail(message: string, code: string, status: number) {
   );
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
@@ -41,16 +46,20 @@ export async function POST(
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "عملية غير صالحة.", "INVALID_INPUT", 400);
     }
+    if (parsed.data.action !== "DELIVERED" && parsed.data.previousBottleReturns?.length) return fail("الفارغ السابق يُسجّل عند التسليم فقط.", "INVALID_INPUT", 400);
     const result = await changeEmployeeOrderStatus(
       orderId, parsed.data.action,
       { storeAuthUid: store.authUid, employeeId: operator.employeeId, employeeName: operator.employeeName },
       parsed.data.paymentCollected === true,
+      parsed.data.bottleReturns,
+      parsed.data.previousBottleReturns,
+      parsed.data.paymentDeferred === true,
     );
     return NextResponse.json({ success: true, data: result }, {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
-    if (error instanceof DeliveryOrderBusinessError) {
+    if (error instanceof DeliveryOrderBusinessError || error instanceof InventoryError) {
       return fail(error.message, error.code, error.code === "NOT_FOUND" ? 404 : 409);
     }
     if (isSecurityError(error)) return toSecurityResponse(error);
@@ -58,3 +67,5 @@ export async function POST(
     return fail("تعذر تحديث حالة الطلب.", "INTERNAL_ERROR", 500);
   }
 }
+
+export const POST = withOperationChanges(handlePOST, ["orders","inventory","home"]);

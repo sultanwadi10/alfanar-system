@@ -71,9 +71,7 @@ export default async function SettingsPage() {
           التحكم والأمان
         </h1>
 
-        <p>
-          تشغيل نظام المحل، إيقافه، وإدارة الأجهزة المصرح لها بالوصول.
-        </p>
+
       </div>
 
       <div

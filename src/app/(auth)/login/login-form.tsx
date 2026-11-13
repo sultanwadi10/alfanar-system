@@ -1,4 +1,5 @@
 "use client";
+import { userMessage } from "@/lib/client/user-message";
 
 import {
   useState,
@@ -17,6 +18,7 @@ import {
   getFirebaseClientAuth,
 } from "@/lib/firebase/client";
 
+import { LoginAppearance } from "./login-appearance";
 import styles from "./login.module.css";
 
 type LoginTarget =
@@ -112,9 +114,9 @@ export function LoginForm({
         data.success !== true
       ) {
         setErrorMessage(
-          target === "admin"
+          userMessage(target === "admin"
             ? "تعذر تسجيل الدخول كمسؤول. تأكد من الحساب والصلاحية."
-            : "تعذر تسجيل الدخول إلى حساب المحل. تأكد من الحساب والصلاحية.",
+            : "تعذر تسجيل الدخول إلى حساب المحل. تأكد من الحساب والصلاحية."),
         );
 
         return;
@@ -129,180 +131,49 @@ export function LoginForm({
       router.refresh();
     } catch {
       setErrorMessage(
-        "بيانات تسجيل الدخول غير صحيحة أو تعذر الاتصال بالخدمة.",
+        userMessage("بيانات تسجيل الدخول غير صحيحة أو تعذر الاتصال بالخدمة."),
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const isAdmin =
-    target === "admin";
-
+  const isAdmin = target === "admin";
   return (
-    <main
-      className={styles.page}
-      dir="rtl"
-    >
-      <section
-        className={styles.loginCard}
-      >
-        <header
-          className={styles.header}
-        >
-          <div
-            className={
-              styles.brandMark
-            }
-          >
-            A
-          </div>
-
-          <div>
-            <p
-              className={
-                styles.companyName
-              }
-            >
-              GLE TECHNOLOGY
-            </p>
-
-            <h1>
-              نظام محطة الفنار
-            </h1>
-
-            <p
-              className={
-                styles.subtitle
-              }
-            >
-              {isAdmin
-                ? "دخول الإدارة"
-                : "دخول جهاز المحل المصرح"}
-            </p>
-          </div>
+    <LoginAppearance target={target}>
+      <section className={styles.loginCard} aria-labelledby="login-heading">
+        <header className={styles.header}>
+          <h1 id="login-heading">تسجيل الدخول</h1>
+          <span className={styles.targetBadge}>{isAdmin ? "الإدارة" : "المحل"}</span>
         </header>
-
-        <div
-          className={
-            styles.contextBox
-          }
-        >
-          <strong>
-            {isAdmin
-              ? "دخول الإدارة"
-              : "دخول المحل"}
-          </strong>
-
-          <span>
-            {isAdmin
-              ? "مخصص لصاحب المحطة والإدارة."
-              : "هذا الجهاز مربوط مسبقًا ومسموح له بفتح بيئة المحل."}
-          </span>
-        </div>
-
-        <form
-          className={styles.form}
-          onSubmit={handleLogin}
-        >
-          <label>
-            البريد الإلكتروني
-
-            <input
-              type="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(
-                  event.target.value,
-                )
-              }
-              placeholder="example@email.com"
-              autoComplete="email"
-              disabled={loading}
-              required
-            />
-          </label>
-
-          <label>
-            كلمة المرور
-
-            <div
-              className={
-                styles.passwordField
-              }
-            >
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={password}
-                onChange={(event) =>
-                  setPassword(
-                    event.target.value,
-                  )
-                }
-                placeholder="أدخل كلمة المرور"
-                autoComplete="current-password"
-                disabled={loading}
-                required
-              />
-
-              <button
-                type="button"
-                className={
-                  styles.showPasswordButton
-                }
-                onClick={() =>
-                  setShowPassword(
-                    (current) =>
-                      !current,
-                  )
-                }
-                disabled={loading}
-              >
-                {showPassword
-                  ? "إخفاء"
-                  : "إظهار"}
+        <form className={styles.form} onSubmit={handleLogin} aria-busy={loading}>
+          <div className={styles.field}>
+            <label htmlFor="login-email">البريد الإلكتروني</label>
+            <input id="login-email" name="email" type="email" dir="ltr" inputMode="email" autoCapitalize="none" spellCheck={false}
+              value={email} onChange={event => setEmail(event.target.value)} placeholder="name@example.com"
+              autoComplete="username" disabled={loading} required />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="login-password">كلمة المرور</label>
+            <div className={styles.passwordField}>
+              <input id="login-password" name="password" dir="ltr" type={showPassword ? "text" : "password"}
+                value={password} onChange={event => setPassword(event.target.value)} placeholder="••••••••"
+                autoComplete="current-password" disabled={loading} required />
+              <button type="button" className={styles.showPasswordButton} onClick={() => setShowPassword(current => !current)}
+                aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"} aria-pressed={showPassword} aria-controls="login-password" disabled={loading}>
+                <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {showPassword ? <><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M6.1 6.1C4.1 7.4 2.5 9.4 1.5 12c2 5 5.5 7.5 10.5 7.5 2.2 0 4.2-.5 5.9-1.6M9 4.8c1-.2 2-.3 3-.3 5 0 8.5 2.5 10.5 7.5-.8 2-1.8 3.6-3.1 4.8"/></> : <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>}
+                </svg>
               </button>
             </div>
-          </label>
-
-          {errorMessage && (
-            <div
-              className={
-                styles.errorMessage
-              }
-              role="alert"
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className={
-              styles.loginButton
-            }
-            disabled={loading}
-          >
-            {loading
-              ? "جاري تسجيل الدخول..."
-              : isAdmin
-                ? "دخول الإدارة"
-                : "دخول المحل"}
+          </div>
+          {errorMessage && <div className={styles.errorMessage} role="alert">{errorMessage}</div>}
+          <button type="submit" className={styles.loginButton} disabled={loading}>
+            {loading && <span className={styles.spinner} aria-hidden="true"/>}
+            {loading ? "جارٍ تسجيل الدخول…" : "دخول"}
           </button>
         </form>
-
-        <footer
-          className={styles.footer}
-        >
-          Alfanar Water Station
-          <span>•</span>
-          GLE TECHNOLOGY
-        </footer>
       </section>
-    </main>
+    </LoginAppearance>
   );
 }

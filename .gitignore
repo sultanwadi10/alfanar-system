@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local backups and credentials are never project source.
+/alfanar-backups/
+/alfanar-private-backups/
+/.data-backups/
+firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+*.service-account.json

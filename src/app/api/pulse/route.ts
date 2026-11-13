@@ -1,10 +1,8 @@
+import { readPulseState } from "@/lib/updates/pulse-state";
 import {
   NextResponse,
 } from "next/server";
 
-import {
-  getStoreSecurityContext,
-} from "@/lib/security/get-store-security-context";
 import {
   isSecurityError,
 } from "@/lib/security/is-security-error";
@@ -14,12 +12,10 @@ export const dynamic =
 
 export async function GET() {
   try {
-    await getStoreSecurityContext();
+    const state = await readPulseState();
 
     return NextResponse.json(
-      {
-        ok: true,
-      },
+      state,
       {
         headers: {
           "Cache-Control":

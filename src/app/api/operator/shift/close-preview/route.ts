@@ -14,6 +14,7 @@ export async function GET() {
     const operator =
       await resolveOperatorSession(
         storeContext.authUid,
+        { handoverOnly: true },
       );
 
     if (!operator) {
