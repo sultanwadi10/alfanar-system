@@ -19,6 +19,7 @@ import {
 } from "@/lib/firebase/client";
 
 import { LoginAppearance } from "./login-appearance";
+import { PasswordResetForm } from "./password-reset-form";
 import styles from "./login.module.css";
 
 type LoginTarget =
@@ -35,6 +36,8 @@ export function LoginForm({
 }: LoginFormProps) {
   const router =
     useRouter();
+
+  const [resetMode, setResetMode] = useState(false);
 
   const [email, setEmail] =
     useState("");
@@ -139,6 +142,17 @@ export function LoginForm({
   }
 
   const isAdmin = target === "admin";
+  if (resetMode) {
+    return <LoginAppearance target={target}>
+      <PasswordResetForm initialEmail={email} target={target} onBack={address => {
+        setEmail(address);
+        setPassword("");
+        setErrorMessage("");
+        setShowPassword(false);
+        setResetMode(false);
+      }} />
+    </LoginAppearance>;
+  }
   return (
     <LoginAppearance target={target}>
       <section className={styles.loginCard} aria-labelledby="login-heading">
@@ -172,6 +186,11 @@ export function LoginForm({
             {loading && <span className={styles.spinner} aria-hidden="true"/>}
             {loading ? "جارٍ تسجيل الدخول…" : "دخول"}
           </button>
+          <button type="button" className={styles.textButton} disabled={loading} onClick={() => {
+            setPassword("");
+            setErrorMessage("");
+            setResetMode(true);
+          }}>نسيت كلمة المرور؟</button>
         </form>
       </section>
     </LoginAppearance>

@@ -107,6 +107,12 @@
 .loginButton:focus-visible, .showPasswordButton:focus-visible, .themeSwitch button:focus-visible { outline: 3px solid #51b3ff; outline-offset: 4px; }
 .errorMessage { padding: 12px 14px; border: 1px solid #bf6570; border-radius: 12px; background: #401f2b; color: #ffe0e5; font-size: 14px; overflow-wrap: anywhere; }
 .page[data-login-theme="light"] .errorMessage { background: #fff0f1; color: #932337; border-color: #e4aab3; }
+.textButton { min-height: 44px; width: 100%; padding: 10px; border: 0; border-radius: 10px; background: transparent; color: var(--login-text); font: inherit; font-size: 16px; cursor: pointer; text-decoration: underline; text-underline-offset: 5px; }
+.textButton:hover:not(:disabled) { background: var(--login-ring); }
+.textButton:focus-visible { outline: 3px solid #51b3ff; outline-offset: 3px; }
+.textButton:disabled { opacity: .65; cursor: wait; }
+.successMessage { padding: 12px 14px; border: 1px solid #38866b; border-radius: 12px; background: #103f35; color: #d5ffed; font-size: 14px; overflow-wrap: anywhere; }
+.page[data-login-theme="light"] .successMessage { background: #ecfbf3; color: #14533c; border-color: #88bda2; }
 .spinner { width: 19px; height: 19px; border: 2px solid rgba(255, 255, 255, .4); border-top-color: white; border-radius: 50%; animation: login-spin .8s linear infinite; }
 @keyframes login-spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) { .shell { padding: 26px; } .content { gap: 26px; } .loginCard { padding: 30px 25px; } .brandName { font-size: 38px; } }
