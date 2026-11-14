@@ -131,3 +131,32 @@ test("failed send remains retryable and edited email clears old feedback", async
   assert.equal(find(tree, n => n.props.role === "alert"), undefined);
   assert.equal(find(tree, n => n.type === "input").props.value, "new@example.com");
 });
+
+test("admin settings opens store recovery without logout, shift actions or email side effects", () => {
+  const code = compile("../../src/app/admin/settings/store-password-recovery.tsx");
+  const states = [], exports = {};
+  let cursor = 0;
+  const ResetForm = () => {};
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(code, { exports, require(name) {
+    if (name === "react/jsx-runtime") return { jsx, jsxs: jsx };
+    if (name === "react") return { useState(initial) {
+      const i = cursor++;
+      if (!(i in states)) states[i] = initial;
+      return [states[i], value => { states[i] = value; }];
+    } };
+    if (name === "@/app/(auth)/login/password-reset-form") return { PasswordResetForm: ResetForm };
+    if (name === "./settings.module.css") return { default: {} };
+    throw Error(`Unexpected dependency ${name}`);
+  }, fetch() { assert.fail("settings must not call logout, shift or reset endpoints"); } });
+  const render = () => { cursor = 0; return exports.StorePasswordRecovery(); };
+  find(render(), n => n.type === "button").props.onClick();
+  let reset = find(render(), n => n.type === ResetForm);
+  assert.equal(reset.props.target, "store");
+  assert.equal(reset.props.backLabel, "إغلاق");
+  reset.props.onBack("store@example.com");
+  assert.equal(find(render(), n => n.type === ResetForm), undefined);
+  find(render(), n => n.type === "button").props.onClick();
+  reset = find(render(), n => n.type === ResetForm);
+  assert.equal(reset.props.initialEmail, "store@example.com");
+});

@@ -14,6 +14,7 @@ import {
 } from "@/lib/store/store-runtime-repository";
 
 import styles from "./settings.module.css";
+import { StorePasswordRecovery } from "./store-password-recovery";
 
 export const dynamic =
   "force-dynamic";
@@ -79,6 +80,8 @@ export default async function SettingsPage() {
           styles.settingsStack
         }
       >
+        <StorePasswordRecovery />
+
         <StoreRuntimeControl
           initialState={{
             status:

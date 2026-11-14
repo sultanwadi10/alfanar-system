@@ -4,10 +4,11 @@ import { useRef, useState, type FormEvent } from "react";
 import { requestPasswordReset } from "@/lib/client/password-reset";
 import styles from "./login.module.css";
 
-export function PasswordResetForm({ initialEmail, target, onBack }: {
+export function PasswordResetForm({ initialEmail, target, onBack, backLabel = "الرجوع لتسجيل الدخول" }: {
   initialEmail: string;
   target: "admin" | "store";
   onBack: (email: string) => void;
+  backLabel?: string;
 }) {
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
@@ -54,7 +55,7 @@ export function PasswordResetForm({ initialEmail, target, onBack }: {
           {loading ? "جارٍ الإرسال…" : sent ? "تم طلب الرابط" : "إرسال رابط التغيير"}
         </button>
         <button type="button" className={styles.textButton} disabled={loading} onClick={() => onBack(email.trim())}>
-          الرجوع لتسجيل الدخول
+          {backLabel}
         </button>
       </form>
     </section>

@@ -3,6 +3,33 @@
   margin: 0 auto;
 }
 
+.recoveryHost {
+  --login-card: var(--color-surface);
+  --login-input: var(--color-surface-secondary);
+  --login-text: var(--color-text);
+  --login-muted: var(--color-text-muted);
+  --login-border: var(--color-border);
+  --login-ring: rgba(70, 165, 255, .22);
+  --login-shadow: none;
+  min-width: 0;
+}
+.recoveryHost > section { max-width: 100%; box-sizing: border-box; }
+.recoveryHost h1 { font-size: clamp(23px, 4vw, 30px); }
+.recoveryButton {
+  margin-top: 18px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 12px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.recoveryButton:focus-visible { outline: 3px solid #51b3ff; outline-offset: 3px; }
+
 .pageHeader {
   margin-bottom: 24px;
 }
