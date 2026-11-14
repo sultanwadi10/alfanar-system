@@ -3,6 +3,7 @@ import {
   NextResponse,
 } from "next/server";
 import { z } from "zod";
+import { logUnlockFailure } from "@/lib/security/unlock-diagnostics";
 
 import {
   ADMIN_STEALTH_ACCESS_CONFIG,
@@ -36,21 +37,26 @@ function createNeutralResponse() {
 }
 
 export async function POST(request: Request) {
+  let stage: "origin" | "body" | "verify" | "grant" = "origin";
   try {
     if (!hasValidOrigin(request)) {
+      logUnlockFailure("admin", stage, "origin_mismatch", request);
       return createNeutralResponse();
     }
 
    
 
+    stage = "body";
     const body = requestSchema.safeParse(
       await request.json(),
     );
 
     if (!body.success) {
+      logUnlockFailure("admin", stage, "invalid_input", request);
       return createNeutralResponse();
     }
 
+    stage = "verify";
     const allowed =
       await verifyAdminStealthUnlock({
         code: body.data.code,
@@ -61,9 +67,11 @@ export async function POST(request: Request) {
       });
 
     if (!allowed) {
+      logUnlockFailure("admin", stage, "verification_rejected", request);
       return createNeutralResponse();
     }
 
+    stage = "grant";
     const grant =
       await createAdminStealthAccessGrant();
 
@@ -93,7 +101,8 @@ export async function POST(request: Request) {
     );
 
     return response;
-  } catch {
+  } catch (error) {
+    logUnlockFailure("admin", stage, "internal_failure", request, error);
     // Fail closed without revealing the admin entry.
     return createNeutralResponse();
   }

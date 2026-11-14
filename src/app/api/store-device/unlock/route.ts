@@ -2,6 +2,7 @@ import {
   NextResponse,
 } from "next/server";
 import { z } from "zod";
+import { logUnlockFailure } from "@/lib/security/unlock-diagnostics";
 
 import {
   hasValidOrigin,
@@ -46,15 +47,18 @@ function createNeutralResponse() {
 export async function POST(
   request: Request,
 ) {
+  let stage: "origin" | "runtime" | "body" | "verify" | "grant" = "origin";
   try {
     if (
       !hasValidOrigin(
         request,
       )
     ) {
+      logUnlockFailure("store", stage, "origin_mismatch", request);
       return createNeutralResponse();
     }
 
+    stage = "runtime";
     const runtime =
       await getStoreRuntimeState();
 
@@ -62,18 +66,22 @@ export async function POST(
       runtime.status ===
       STORE_RUNTIME_STATUSES.STOPPED
     ) {
+      logUnlockFailure("store", stage, "store_stopped", request);
       return createNeutralResponse();
     }
 
+    stage = "body";
     const parsed =
       requestSchema.safeParse(
         await request.json(),
       );
 
     if (!parsed.success) {
+      logUnlockFailure("store", stage, "invalid_input", request);
       return createNeutralResponse();
     }
 
+    stage = "verify";
     const allowed =
       await verifyStoreStealthUnlock({
         code:
@@ -86,9 +94,11 @@ export async function POST(
       });
 
     if (!allowed) {
+      logUnlockFailure("store", stage, "verification_rejected", request);
       return createNeutralResponse();
     }
 
+    stage = "grant";
     const grant =
       await createStoreStealthAccessGrant();
 
@@ -128,7 +138,8 @@ export async function POST(
     );
 
     return response;
-  } catch {
+  } catch (error) {
+    logUnlockFailure("store", stage, "internal_failure", request, error);
     return createNeutralResponse();
   }
 }
