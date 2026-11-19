@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:preview": "node scripts/preview/launch.mjs",
+    "preview:seed": "node scripts/preview/seed.mjs",
+    "test:operational": "node scripts/tests/run-operational.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

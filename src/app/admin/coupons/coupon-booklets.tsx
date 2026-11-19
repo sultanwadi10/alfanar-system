@@ -10,7 +10,7 @@ import ActionModal from "@/components/ui/action-modal";
 
 type Booklet = {
   id: string; serial: string; status: "IN_STOCK" | "ACTIVE" | "EXHAUSTED";
-  customerId: string | null; orderId: string | null;
+  customerId: string | null; customerName: string | null; orderId: string | null;
   issuedCoupons: number; remainingCoupons: number; reservedCoupons: number;
   createdAt: string | null; activatedAt: string | null;
 };
@@ -62,7 +62,6 @@ export default function CouponBooklets() {
   const [success, setSuccess] = useState("");
   useTransientMessage(success, setSuccess);
   const [priceInput, setPriceInput] = useState("");
-  const [conversion,setConversion]=useState<{total:number;changes:Array<{id:string;before:string;after:string}>;conflicts:Array<{serial:string;existing:string[]}>}|null>(null);
   const [serial, setSerial] = useState("");
   const [search, setSearch] = useState("");
   const [approveSelection, setApproveSelection] = useState<Record<string, string>>({});
@@ -117,7 +116,7 @@ export default function CouponBooklets() {
   const shown = useMemo(() => (data?.booklets ?? []).filter(b => {
     if (filter !== "ALL" && b.status !== filter) return false;
     const q = search.trim().toLowerCase();
-    return !q || b.serial.toLowerCase().includes(q) || (b.customerId ?? "").toLowerCase().includes(q) || (b.orderId ?? "").toLowerCase().includes(q);
+    return !q || b.serial.toLowerCase().includes(q) || (b.customerName ?? "").toLowerCase().includes(q) || (b.customerId ?? "").toLowerCase().includes(q) || (b.orderId ?? "").toLowerCase().includes(q);
   }), [data, filter, search]);
   const stats = useMemo(() => ({
     total: data?.booklets.length ?? 0, inStock: stock.length,
@@ -152,8 +151,6 @@ export default function CouponBooklets() {
     setError("");
     setConfirmDialog({ kind: "PRICE", priceFils: fils });
   }
-  async function previewSerials(){setBusy(true);setError("");try{const response=await fetch("/api/admin/coupon-booklets/serials",{cache:"no-store"});const result=await response.json();if(!response.ok||!result.success)throw Error(errorText(result));setConversion(result.data);}catch(cause){setError(userMessage(cause instanceof Error?cause.message:"تعذرت المعاينة."));}finally{setBusy(false);}}
-  async function convertSerials(){if(!conversion||conversion.conflicts.length)return;setBusy(true);try{const response=await fetch("/api/admin/coupon-booklets/serials",{method:"POST"});const result=await response.json();if(!response.ok||!result.success)throw Error(errorText(result));setSuccess("تم تحديث أرقام الدفاتر.");setConversion(null);await load(true);}catch(cause){setError(userMessage(cause instanceof Error?cause.message:"تعذّر التحويل."));}finally{setBusy(false);}}
   async function addBooklet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = serial.trim().toUpperCase();
@@ -237,12 +234,12 @@ export default function CouponBooklets() {
     </section>
     <section className={styles.panel}>
       <div className={styles.panelTitle}><div><h2><AlfanarIcon name="book" /> سجل الدفاتر الفعلية</h2></div><span>{shown.length} ظاهر</span></div>
-      <div className={styles.searchRow}><input type="search" aria-label="بحث تسلسلي" value={search} onChange={e => setSearch(e.target.value)} placeholder="رقم دفتر، معرف عميل أو طلب..." />
+      <div className={styles.searchRow}><input type="search" aria-label="بحث تسلسلي" value={search} onChange={e => setSearch(e.target.value)} placeholder="رقم الدفتر، اسم العميل أو الطلب" />
         <select aria-label="فلترة حالة الدفاتر" value={filter} onChange={e => setFilter(e.target.value)}>
           <option value="ALL">جميع الحالات</option><option value="IN_STOCK">في المخزون</option><option value="ACTIVE">نشط</option><option value="EXHAUSTED">مستهلك بالكامل</option>
         </select></div>
       {!shown.length ? <p className={styles.empty}>لا توجد دفاتر مطابقة.</p> : <div className={styles.booklets}>{shown.map(b => <div key={b.id} className={styles.booklet}>
-        <div><strong dir="ltr">{b.serial}</strong><span>{statusLabels[b.status]}</span></div>
+        <div><strong dir="ltr">{b.serial}</strong><span>{b.status === "IN_STOCK" ? statusLabels[b.status] : `${b.status === "ACTIVE" ? "نشط" : "مستهلك بالكامل"} عند ${b.customerName ?? "عميل"}`}</span></div>
         <div><b>{b.status === "IN_STOCK" ? "22 كوبون غير مفعّل" : `${b.remainingCoupons} / 22`}</b><small>{b.status === "IN_STOCK" ? "بلا عميل" : "الرصيد الفعلي بالدفتر"}</small></div>
         <div>{b.customerId ? <Link href={`/admin/customers/${encodeURIComponent(b.customerId)}`}>عرض ملف العميل</Link> : <span>جاهز للبيع</span>}<small>{when(b.activatedAt ?? b.createdAt)}</small></div>
       </div>)}</div>}
@@ -256,10 +253,6 @@ export default function CouponBooklets() {
       </div>)}</div>}
     </section>
 
-    <section className={styles.panel}><h2>أرقام الدفاتر الحالية</h2><button type="button" disabled={busy} onClick={()=>void previewSerials()}>معاينة تحويل الأرقام</button></section>
-    <ActionModal open={conversion!==null} title="توحيد أرقام الدفاتر" description={conversion?.conflicts.length ? "توجد أرقام متكررة؛ التحويل متوقف لحين تصحيحها." : "سيتم تحويل "+(conversion?.changes.length??0)+" رقم."} busy={busy} confirmLabel={conversion?.conflicts.length ? "إغلاق المعاينة" : "اعتماد تحويل الأرقام"} onClose={()=>{if(!busy)setConversion(null);}} onConfirm={()=>{if(conversion?.conflicts.length)setConversion(null);else void convertSerials();}}>
-      <div style={{maxHeight:"40vh",overflowY:"auto"}}>{conversion?.conflicts.map(c=><p key={c.serial}>تعارض الرقم {c.serial}: {c.existing.join("، ")}</p>)}{conversion?.changes.map(c=><p key={c.id} dir="ltr">{c.before} → {c.after}</p>)}</div>
-    </ActionModal>
     <ActionModal
       open={confirmDialog !== null}
       title={confirmDialog?.kind === "PRICE" ? "اعتماد سعر الدفتر" : "اعتماد الدفتر للعميل"}

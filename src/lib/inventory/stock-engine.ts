@@ -19,7 +19,7 @@ export function assertItem(data: DocumentData | undefined, id: string): StockIte
   if (data.reservedRoom > data.room || data.reservedCooler > data.cooler) throw new InventoryError("INVALID_STOCK", "حجز المخزون غير متسق. راجع الإدارة.");
   return { ...data, id } as StockItem;
 }
-export type InventoryLine = { productId: string; quantity: number; bottleOrigin?: "JORDANIAN" | "SAUDI" | null };
+export type InventoryLine = { productId: string; quantity: number; personalBottleQuantity?: number; bottleOrigin?: "JORDANIAN" | "SAUDI" | null };
 type Actor = { id: string; name: string; type: "ADMIN" | "EMPLOYEE" };
 type Context = { operationId: string; actor: Actor; customerId?: string; customerName?: string; orderId?: string; note?: string };
 type State = Map<string, StockItem>;
@@ -89,7 +89,7 @@ export async function prepareNewInventory(tx: Transaction, db: Firestore, lines:
       const materials = policy.autoBottlePools ? centralRecipe! : policy.consumables;
       if (policy.autoBottlePools && !materials.length) throw new InventoryError("RECIPE_REQUIRED", "أكمل الغطاء والختم والكيس من إعداد التعبئة قبل تسجيل تعبئة جديدة.");
       for (const recipe of materials) plan.consumables.push({ itemId: recipe.itemId, quantity: integer(recipe.quantity * line.quantity, "مواد التعبئة", 1) });
-      if (delivery) {
+      if (delivery && line.quantity > (line.personalBottleQuantity ?? 0)) {
         let pool = policy.pools.find(p => p.origin === (line.bottleOrigin ?? "DEFAULT"));
         if (policy.autoBottlePools) {
           if (!line.bottleOrigin) throw new InventoryError("BOTTLE_ORIGIN_REQUIRED", "اختر أردني أو سعودي ضمن طلب التوصيل.");
@@ -99,7 +99,7 @@ export async function prepareNewInventory(tx: Transaction, db: Firestore, lines:
           pool = { itemId: candidates[0].id, origin: candidates[0].origin, quantity: 1 };
         }
         if (!pool) throw new InventoryError("BOTTLE_POOL_MISSING", "نوع قارورة التوصيل غير مربوط برصيد القوارير المستعملة. راجع الإدارة.");
-        plan.allocations.push({ itemId: pool.itemId, quantity: integer(pool.quantity * line.quantity, "قوارير التوصيل", 1), location: "ROOM", role: "BOTTLE", label: "", origin: pool.origin });
+        plan.allocations.push({ itemId: pool.itemId, quantity: integer(pool.quantity * (line.quantity - (line.personalBottleQuantity ?? 0)), "قوارير التوصيل", 1), location: "ROOM", role: "BOTTLE", label: "", origin: pool.origin });
       }
     } else throw new InventoryError("INVALID_POLICY", "ربط المخزون غير صالح.");
   }

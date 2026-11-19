@@ -13,12 +13,12 @@ export function validWage(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 100_000_000;
 }
 export function settleShiftCash(cashFils: number, wageFils: number, actualFils: number) {
-  if (![cashFils, actualFils].every(value => Number.isSafeInteger(value) && value >= 0) || !validWage(wageFils)) throw new Error("Invalid shift money");
+  if (!Number.isSafeInteger(cashFils) || !Number.isSafeInteger(actualFils) || actualFils < 0 || !validWage(wageFils)) throw new Error("Invalid shift money");
   // A negative expected handover remains visible to management; never silently cap the wage.
   const expectedCashFils = cashFils - wageFils;
   return { expectedCashFils, differenceFils: actualFils - expectedCashFils };
 }
-export function shiftTimeSnapshot(at: Date, settings: EmployeeShiftTimeSettings) {
+export function shiftTimeSnapshot(at: Date, settings: EmployeeShiftTimeSettings, chosenType?: "MORNING" | "EVENING") {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Amman", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(at);
   const p = (key: string) => parts.find(x => x.type === key)!.value;
   const minute = Number(p("hour")) * 60 + Number(p("minute"));
@@ -27,7 +27,7 @@ export function shiftTimeSnapshot(at: Date, settings: EmployeeShiftTimeSettings)
     const start = minutes(settings[`${key}Start`]), end = minutes(settings[`${key}End`]);
     return start !== end && (start < end ? minute >= start && minute < end : minute >= start || minute < end);
   });
-  const key = candidates.length === 1 ? candidates[0] : null;
+  const key = chosenType === "MORNING" ? "morning" : chosenType === "EVENING" ? "evening" : candidates.length === 1 ? candidates[0] : null;
   let workDay = `${p("year")}-${p("month")}-${p("day")}`;
   if (key && minutes(settings[`${key}End`]) < minutes(settings[`${key}Start`]) && minute < minutes(settings[`${key}End`])) {
     const day = new Date(`${workDay}T12:00:00Z`); day.setUTCDate(day.getUTCDate() - 1); workDay = day.toISOString().slice(0, 10);

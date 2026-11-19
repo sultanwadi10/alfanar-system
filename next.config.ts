@@ -32,7 +32,7 @@ const contentSecurityPolicy = [
     "https://*.firebaseapp.com",
     "https://*.web.app",
     ...(isDevelopment
-      ? ["ws:", "wss:"]
+      ? ["ws:", "wss:", ...(process.env.LOCAL_PREVIEW === "1" ? ["http://127.0.0.1:9099"] : [])]
       : []),
   ].join(" "),
   "frame-src 'self' https://*.firebaseapp.com https://*.web.app",
@@ -85,6 +85,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  distDir: process.env.LOCAL_PREVIEW === "1" ? ".next-preview" : ".next",
   poweredByHeader: false,
 
   devIndicators: false,

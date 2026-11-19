@@ -544,6 +544,26 @@ async function attemptStealthUnlock(
     setWaitingForOperand(true);
   }
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (pairingOpen || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const digit = event.key.replace(/[٠-٩]/g, d => String(d.charCodeAt(0)-1632));
+      const operations: Record<string, Operation> = { "+": "+", "-": "−", "*": "×", "/": "÷" };
+      if (/^\d$/.test(digit)) inputDigit(digit);
+      else if (event.key === "." || event.key === ",") inputDecimal();
+      else if (operations[event.key]) chooseOperation(operations[event.key]);
+      else if (event.key === "Enter" || event.key === "=") { event.preventDefault(); if (event.repeat) return; equals(); }
+      else if (event.key === "Backspace") backspace();
+      else if (event.key === "Escape" || event.key === "Delete") resetCalculator();
+      else if (event.key === "%") applyPercent();
+      else return;
+      event.preventDefault();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   async function pairDevice(
     event:
       React.FormEvent<HTMLFormElement>,

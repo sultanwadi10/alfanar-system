@@ -1,4 +1,5 @@
 "use client";
+import { orderItemSummary } from "@/lib/orders/order-item-summary";
 import { userMessage } from "@/lib/client/user-message";
 import { useOperationChanges } from "@/lib/client/operation-changes";
 
@@ -25,6 +26,10 @@ type TodayOrder = {
   customer: { name: string; phone: string; address: string };
   notes: string;
   items: Array<{
+    saleUnit?:string;
+    category?:string;
+    bottleSizeMl?:number;
+    personalBottleQuantity?: number;
     name: string;
     quantity: number;
     bottleOrigin: "JORDANIAN" | "SAUDI" | null;
@@ -34,6 +39,8 @@ type TodayOrder = {
   itemCount: number;
   totalFils: number;
   paymentMethod: PaymentMethod;
+  moneyDueFils?: number;
+  remainderMethod?: string;
   paymentState: string;
   pendingCouponQuantity: number;
   collectedFils: number;
@@ -180,7 +187,7 @@ export default function OrdersToday() {
 
   async function executeStatus(order: TodayOrder, action: "READY" | "DELIVERED" | "CANCELLED") {
     if (busyId) return;
-    if(action === "DELIVERED" && order.paymentMethod !== "COUPON" && !paymentChoice) { setError(userMessage("اختر حالة التحصيل.")); return; }
+    if(action === "DELIVERED" && (order.moneyDueFils ?? (order.paymentMethod === "COUPON" ? 0 : order.totalFils)) > 0 && !paymentChoice) { setError(userMessage("اختر حالة التحصيل.")); return; }
     if (action === "DELIVERED" && (order.returnRequirements ?? []).some(r => !bottleReturns.some(v => v.itemId === r.itemId && Number.isInteger(v.quantity) && v.quantity >= 0 && v.quantity <= r.quantity))) { setError(userMessage("سجّل الفارغ المستلم لكل نوع أو أكّد استلام الكل.")); return; }
     if (action === "DELIVERED" && (previousDebts?.loading || previousBottleReturns.some(row => !Number.isSafeInteger(row.quantity) || row.quantity < 1 || row.quantity > (previousDebts?.rows.find(d => d.itemId === row.itemId)?.quantity ?? 0)))) { setError(userMessage("راجع عدد الفارغ السابق أو انتظر تحميل العهدة.")); return; }
     setBusyId(order.id);
@@ -191,7 +198,7 @@ export default function OrdersToday() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, ...(action === "DELIVERED" ? { bottleReturns, previousBottleReturns } : {}), paymentCollected: action === "DELIVERED" && order.paymentMethod !== "COUPON" && paymentChoice === "PAID", paymentDeferred: action === "DELIVERED" && order.paymentMethod !== "COUPON" && paymentChoice === "DUE" }),
+          body: JSON.stringify({ action, ...(action === "DELIVERED" ? { bottleReturns, previousBottleReturns } : {}), paymentCollected: action === "DELIVERED" && (order.moneyDueFils ?? (order.paymentMethod === "COUPON" ? 0 : order.totalFils)) > 0 && paymentChoice === "PAID", paymentDeferred: action === "DELIVERED" && (order.moneyDueFils ?? (order.paymentMethod === "COUPON" ? 0 : order.totalFils)) > 0 && paymentChoice === "DUE" }),
         },
       );
       const data = await response.json();
@@ -257,7 +264,7 @@ export default function OrdersToday() {
           ? dialogOrder.paymentMethod === "COUPON"
             ? `هل تم تسليم الطلب #${dialogOrder.number} فعليًا؟`
             : `هل استلم العميل الطلب #${dialogOrder.number} فعليًا؟`
-          : `هل تريد إلغاء الطلب #${dialogOrder.number}؟`;
+          : `هل تريد إلغاء الطلب #${dialogOrder.number}؟ ${dialogOrder.status === "READY" ? "أكد رجوع البضاعة للمحل؛ القوارير تذهب للمراجعة ومواد التعبئة المستهلكة لا ترجع." : ""}`;
 
   return (
     <main className={styles.page} dir="rtl">
@@ -322,8 +329,8 @@ export default function OrdersToday() {
                   <h2>{order.customer.name}</h2>
                   <p className={styles.address}>⌖ {order.customer.address}</p>
                   <div className={styles.cardMeta}>
-                    <span>{order.itemCount} قطعة</span>
-                    <span>{payments[order.paymentMethod]}</span>
+                    <span className={styles.itemSummary}>{order.items.map(orderItemSummary).join(" · ")}</span>
+                    <span>{payments[order.paymentMethod]}{(order.moneyDueFils??0)>0&&order.paymentMethod==="COUPON"?` + ${formatMoney(order.moneyDueFils!)} ${order.remainderMethod==="CLICK"?"كليك":"كاش"}`:""}</span>
                     <strong>{formatMoney(order.totalFils)}</strong>
                   </div>
                   {order.status === "DELIVERED" && order.pendingCouponQuantity>0 && <p className={styles.bookletNote}>مستحق: {order.pendingCouponQuantity} كوبون</p>}
@@ -336,7 +343,7 @@ export default function OrdersToday() {
                     {order.status === "NEW" && <button type="button" className={styles.readyButton} disabled={busyId !== null} onClick={() => void changeStatus(order, "READY")}>جاهز ✓</button>}
                     {order.status === "READY" && <button type="button" className={styles.deliverButton} disabled={busyId !== null} onClick={() => void changeStatus(order, "DELIVERED")}>تم التسليم ✓</button>}
                     {order.status === "DELIVERED" && order.bookletRequestStatus === "REQUESTED" && <button type="button" disabled={busyId !== null} onClick={() => void confirmBooklet(order)}>تسليم دفتر + تحصيل ثمنه</button>}
-                    {order.status === "NEW" && <button type="button" className={styles.cancelButton} disabled={busyId !== null} onClick={() => void changeStatus(order, "CANCELLED")}>إلغاء</button>}
+                    {["NEW", "READY"].includes(order.status) && <button type="button" className={styles.cancelButton} disabled={busyId !== null} onClick={() => void changeStatus(order, "CANCELLED")}>إلغاء</button>}
                   </div>
                 </article>
               ))}
@@ -368,7 +375,7 @@ export default function OrdersToday() {
               <h3>الأصناف المطلوبة</h3>
               {selectedOrder.items.map((item, index) => (
                 <div key={`${index}-${item.name}`} className={styles.detailItem}>
-                  <span>{item.name}{item.bottleOrigin ? ` — ${item.bottleOrigin === "JORDANIAN" ? "أردني" : "سعودي"}` : ""} × {item.quantity}</span>
+                  <span>{item.name}{item.bottleOrigin ? ` — ${item.bottleOrigin === "JORDANIAN" ? "أردني" : "سعودي"}` : ""} × {item.quantity}{(item.personalBottleQuantity??0)>0&&<small> · {item.personalBottleQuantity} من قوارير العميل الخاصة — بدون عهدة</small>}</span>
                   <strong>{formatMoney(item.lineTotalFils)}</strong>
                 </div>
               ))}
@@ -388,7 +395,7 @@ export default function OrdersToday() {
               {selectedOrder.status === "NEW" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "READY")}>تأكيد تجهيز الطلب</button>}
               {selectedOrder.status === "READY" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "DELIVERED")}>تأكيد التسليم</button>}
               {selectedOrder.status === "DELIVERED" && selectedOrder.bookletRequestStatus === "REQUESTED" && <button type="button" disabled={busyId !== null} onClick={() => void confirmBooklet(selectedOrder)}>تأكيد تسليم الدفتر وقبض ثمنه</button>}
-              {selectedOrder.status === "NEW" && <button type="button" className={styles.cancelButton} disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "CANCELLED")}>إلغاء الطلب</button>}
+              {["NEW", "READY"].includes(selectedOrder.status) && <button type="button" className={styles.cancelButton} disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "CANCELLED")}>إلغاء الطلب</button>}
             </div>
           </section>
         </div>
@@ -400,7 +407,7 @@ export default function OrdersToday() {
         tone={actionDialog?.kind === "BOOKLET" ? "warning" : dialogAction === "CANCELLED" ? "danger" : dialogAction === "DELIVERED" ? "success" : "info"}
         busy={busyId !== null}
         confirmLabel={actionDialog?.kind === "BOOKLET" ? "تأكيد التسليم والتحصيل" : dialogAction === "READY" ? "اعتماد التجهيز" : dialogAction === "DELIVERED" ? "تأكيد التسليم" : "تأكيد الإلغاء"}
-        confirmDisabled={actionDialog?.kind === "BOOKLET" ? !bookletPayment : dialogAction === "DELIVERED" && ((dialogOrder?.paymentMethod !== "COUPON" && !paymentChoice) || !currentComplete || !previousValid || activePrevious?.loading === true)}
+        confirmDisabled={actionDialog?.kind === "BOOKLET" ? !bookletPayment : dialogAction === "DELIVERED" && ((dialogOrder && (dialogOrder.moneyDueFils ?? (dialogOrder.paymentMethod === "COUPON" ? 0 : dialogOrder.totalFils)) > 0 && !paymentChoice) || !currentComplete || !previousValid || activePrevious?.loading === true)}
         choices={actionDialog?.kind === "BOOKLET" ? [
           { value: "CASH", label: "كاش", description: "تحصيل نقدي" },
           { value: "CLICK", label: "كليك", description: "تحصيل إلكتروني" },
@@ -417,7 +424,7 @@ export default function OrdersToday() {
           }
         }}
       >
-        {dialogAction === "DELIVERED" && dialogOrder && <fieldset disabled={busyId!==null} style={{display:"grid",gap:14,padding:16,border:"1px solid var(--color-border)",borderRadius:14}}><legend>التحصيل عند التسليم</legend>{dialogOrder.paymentMethod === "COUPON" ? <p>{dialogOrder.pendingCouponQuantity>0 ? "المتبقي على العميل: "+dialogOrder.pendingCouponQuantity+" كوبون" : "الكوبونات متوفرة للطلب"}</p> : <><label><input type="radio" name="collection" checked={paymentChoice==="PAID"} onChange={()=>setPaymentChoice("PAID")}/> تم استلام {formatMoney(dialogOrder.totalFils)} — {payments[dialogOrder.paymentMethod]}</label><label><input type="radio" name="collection" checked={paymentChoice==="DUE"} onChange={()=>setPaymentChoice("DUE")}/> تم تسليم الطلب والمبلغ باقي على العميل</label></>}</fieldset>}
+        {dialogAction === "DELIVERED" && dialogOrder && <fieldset disabled={busyId!==null} style={{display:"grid",gap:14,padding:16,border:"1px solid var(--color-border)",borderRadius:14}}><legend>التحصيل عند التسليم</legend>{(dialogOrder.moneyDueFils ?? (dialogOrder.paymentMethod === "COUPON" ? 0 : dialogOrder.totalFils)) === 0 ? <p>{dialogOrder.pendingCouponQuantity>0 ? "المتبقي على العميل: "+dialogOrder.pendingCouponQuantity+" كوبون" : "الكوبونات متوفرة للطلب"}</p> : <><label><input type="radio" name="collection" checked={paymentChoice==="PAID"} onChange={()=>setPaymentChoice("PAID")}/> تم استلام {formatMoney(dialogOrder.moneyDueFils ?? dialogOrder.totalFils)} — {payments[(dialogOrder.remainderMethod ?? dialogOrder.paymentMethod) as PaymentMethod]}</label><label><input type="radio" name="collection" checked={paymentChoice==="DUE"} onChange={()=>setPaymentChoice("DUE")}/> تم تسليم الطلب والمبلغ باقي على العميل</label></>}</fieldset>}
         {dialogAction === "DELIVERED" && dialogOrder && (dialogOrder.returnRequirements ?? []).length > 0 && <>
           <BottleReturnFields key={dialogOrder.id} requirements={dialogOrder.returnRequirements ?? []} value={bottleReturns} onChange={setBottleReturns} disabled={busyId !== null}/>
           {activePrevious?.loading && <p role="status">جارٍ تحميل العهدة السابقة…</p>}

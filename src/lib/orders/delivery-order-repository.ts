@@ -1,4 +1,6 @@
-import { customerDeliveryUnitPrice,customerSpecialDeliveryPrice } from "@/lib/customers/delivery-pricing";
+import { preparePrivateBottles } from "@/lib/customers/private-bottles";
+import { deliveryPaymentPlan } from "./payment-plan";
+import { customerDeliveryUnitPrice,refillBottleSize } from "@/lib/customers/delivery-pricing";
 import { InventoryError, keyFor, prepareNewInventory } from "@/lib/inventory/stock-engine";
 import "server-only";
 
@@ -103,10 +105,12 @@ export async function createDeliveryOrder(
       productIds.map((id) => tx.get(db.collection("products").doc(id))),
     );
     const productMap = new Map(productDocs.map((snapshot) => [snapshot.id, snapshot.data()]));
-    const pricingPolicies=new Map<string,unknown>();
-    if(customerSpecialDeliveryPrice(customer)!==null){
-      await Promise.all(productDocs.filter(doc=>doc.data()?.category==="REFILL").map(async doc=>{const policy=await tx.get(db.collection("inventoryPolicies").doc(doc.id));pricingPolicies.set(doc.id,policy.data()?.bottleSizeMl);}));
-    }
+    const policyDocs=await Promise.all(productDocs.map(doc=>tx.get(db.collection("inventoryPolicies").doc(doc.id))));
+    const policyMap=new Map(policyDocs.map(doc=>[doc.id,doc.data()]));
+    const pricingPolicies=new Map(policyDocs.map(doc=>[doc.id,doc.data()?.bottleSizeMl]));
+    const stockIds=[...new Set(policyDocs.map(doc=>doc.data()?.itemId).filter((id):id is string=>typeof id==="string"&&id.length>0))];
+    const stockDocs=await Promise.all(stockIds.map(id=>tx.get(db.collection("inventoryItems").doc(id))));
+    const stockMap=new Map(stockDocs.map(doc=>[doc.id,doc.data()]));
     const uniqueLines = new Set<string>();
     let totalFils = 0;
     let couponQuantity = 0;
@@ -133,18 +137,19 @@ export async function createDeliveryOrder(
       const lineTotalFils = unitPriceFils * item.quantity;
       totalFils += lineTotalFils;
       if (product.category === "REFILL") couponQuantity += item.quantity;
-      if (input.paymentMethod === "COUPON" && product.category !== "REFILL") {
-        throw new DeliveryOrderBusinessError(
-          "COUPON_ITEMS",
-          "الكوبونات مخصصة لتعبئة قوارير المياه فقط. سجّل المنتجات الأخرى بطلب كاش أو كليك.",
-        );
-      }
+      const policy=policyMap.get(item.productId),stock=policy?.itemId?stockMap.get(policy.itemId):undefined;
+      const saleUnit=stock?(policy?.unitsPerSale===stock.unitsPerPack?stock.packLabel:policy?.unitsPerSale===1?stock.baseUnit:""):"";
       return {
+        saleUnitSnapshot:typeof saleUnit==="string"?saleUnit:"",
         productId: item.productId,
         productNameSnapshot: product.name,
         category: product.category,
+        bottleSizeMl: refillBottleSize(product,pricingPolicies.get(item.productId)),
         quantity: item.quantity,
         bottleOrigin: item.bottleOrigin,
+        personalBottleQuantity: item.personalBottleQuantity,
+        storeBottleShortageConfirmed: item.storeBottleShortageConfirmed,
+        ...(item.expectedPrivateBottleQuantity!==undefined?{expectedPrivateBottleQuantity:item.expectedPrivateBottleQuantity}:{}),
         unitPriceFils,
         standardUnitPriceFils: product.deliveryPriceFils,
         pricingSource: pricing.source,
@@ -191,11 +196,15 @@ export async function createDeliveryOrder(
         if (needed === 0) break;
       }
       if (needed > 0) {
-        pendingCouponQuantity = needed;
-        paymentState = "AWAITING_BOOKLET_APPROVAL";
+        pendingCouponQuantity = 0;
       }
     }
 
+    const payment = deliveryPaymentPlan(orderItems, allocations.reduce((sum, row) => sum + row.quantity, 0), input.paymentMethod === "COUPON");
+    if (input.expectedCouponQuantity !== undefined && input.expectedCouponQuantity !== payment.couponQuantity) throw new DeliveryOrderBusinessError("COUPON_BALANCE_CHANGED", "تغير رصيد الكوبونات. حدّث رصيد العميل وراجع المبلغ المتبقي قبل التأكيد.");
+    couponQuantity = payment.couponQuantity;
+    paymentState = payment.moneyDueFils > 0 ? "DUE_ON_DELIVERY" : "COUPONS_RESERVED";
+    orderItems.forEach((item, index) => Object.assign(item, payment.items[index]));
     const counter = await tx.get(counterRef);
     const next = ((counter.data()?.lastSequence as number | undefined) ?? 0) + 1;
     const orderNumber = String(next).padStart(3, "0");
@@ -203,9 +212,11 @@ export async function createDeliveryOrder(
     const orderRef = db.collection("deliveryOrders").doc(orderId);
     const now = Timestamp.now();
 
-    const inventory = await prepareNewInventory(tx, db, input.items, true, { operationId: `order:${orderId}:reserve`, actor: { id: actor.employeeId, name: actor.employeeName, type: actor.actorType ?? "EMPLOYEE" }, customerId: input.customerId, customerName: customer.name, orderId });
+    const privateBottles=await preparePrivateBottles(tx,db,input.customerId,orderItems,"RESERVE",orderId,actor.employeeId);
+    const inventory = await prepareNewInventory(tx, db, orderItems, true, { operationId: `order:${orderId}:reserve`, actor: { id: actor.employeeId, name: actor.employeeName, type: actor.actorType ?? "EMPLOYEE" }, customerId: input.customerId, customerName: customer.name, orderId });
     // All reads above, all writes below.
     inventory.commit();
+    privateBottles.commit();
     for (const allocation of allocations) {
       const bookletRef = db.collection("couponBooklets").doc(allocation.bookletId);
       // The transaction retries if the booklet changes concurrently.
@@ -228,6 +239,10 @@ export async function createDeliveryOrder(
       items: orderItems,
       itemCount: input.items.reduce((sum, item) => sum + item.quantity, 0),
       totalFils,
+      paymentVersion: 2,
+      moneyDueFils: payment.moneyDueFils,
+      couponValueFils: payment.couponValueFils,
+      remainderMethod: input.remainderMethod,
       paymentMethod: input.paymentMethod,
       paymentState,
       couponQuantity: input.paymentMethod === "COUPON" ? couponQuantity : 0,

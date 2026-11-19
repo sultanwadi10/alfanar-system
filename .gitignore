@@ -48,3 +48,11 @@ next-env.d.ts
 firebase-adminsdk*.json
 *-firebase-adminsdk-*.json
 *.service-account.json
+
+# Isolated local preview output
+.next-preview/
+.next-verify/
+firebase-debug.log
+firestore-debug.log
+.preview-tools.local.json
+.preview-tools/

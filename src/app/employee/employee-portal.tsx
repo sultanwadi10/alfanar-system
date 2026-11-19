@@ -1,4 +1,5 @@
 "use client";
+import { parseDinars, dinars } from "@/lib/format/money-input";
 import { userMessage } from "@/lib/client/user-message";
 
 import {
@@ -186,56 +187,8 @@ async function fetchShiftState(): Promise<ShiftResult> {
   }
 }
 
-function parsePriceToFils(
-  value: string,
-): number | null {
-  const normalized =
-    value.trim();
-
-  if (
-    !/^\d+(?:\.\d{1,3})?$/.test(
-      normalized,
-    )
-  ) {
-    return null;
-  }
-
-  const [
-    wholePart,
-    fractionPart = "",
-  ] =
-    normalized.split(".");
-
-  const whole =
-    Number(
-      wholePart,
-    );
-
-  const fraction =
-    Number(
-      fractionPart.padEnd(
-        3,
-        "0",
-      ),
-    );
-
-  const result =
-    whole * 1000 +
-    fraction;
-
-  if (
-    !Number.isSafeInteger(
-      result,
-    ) ||
-    result < 0
-  ) {
-    return null;
-  }
-
-  return result;
-}
-
 export default function EmployeePortal() {
+  const [openingShiftType,setOpeningShiftType]=useState<"MORNING"|"EVENING">("MORNING");
   const router =
     useRouter();
 
@@ -307,11 +260,10 @@ export default function EmployeePortal() {
   ] =
     useState(false);
 
-  const [
-    actualCash,
-    setActualCash,
-  ] =
-    useState("");
+  const [banknotes, setBanknotes] = useState("");
+  const [coins, setCoins] = useState("");
+  const banknotesValue = parseDinars(banknotes), coinsValue = parseDinars(coins);
+  const countedCash = banknotesValue !== null && coinsValue !== null ? banknotesValue + coinsValue : null;
 
   const [
     cashConfirmed,
@@ -641,6 +593,8 @@ export default function EmployeePortal() {
           {
             method:
               "POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({shiftType:openingShiftType}),
           },
         );
 
@@ -765,7 +719,7 @@ export default function EmployeePortal() {
         return;
       }
 
-      setActualCash("");
+      setBanknotes(""); setCoins("");
 
       setCashConfirmed(
         false,
@@ -792,14 +746,11 @@ export default function EmployeePortal() {
     event.preventDefault();
     if (closeLoading || !shift) return;
 
-    const actualCashFils =
-      parsePriceToFils(
-        actualCash,
-      );
+    const actualCashFils = countedCash;
 
     if (
       actualCashFils ===
-      null
+      null || actualCashFils > 100_000_000
     ) {
       setErrorMessage(
         userMessage("أدخل مبلغ الكاش الموجود فعليًا بشكل صحيح."),
@@ -838,6 +789,7 @@ export default function EmployeePortal() {
             body:
               JSON.stringify({
                 actualCashFils,
+                banknotesFils: banknotesValue, coinsFils: coinsValue,
                 shiftId: shift.id,
               }),
           },
@@ -876,7 +828,7 @@ export default function EmployeePortal() {
         false,
       );
 
-      setActualCash("");
+      setBanknotes(""); setCoins("");
 
       setCashConfirmed(
         false,
@@ -1334,6 +1286,7 @@ export default function EmployeePortal() {
             </div>
           )}
 
+          <label>نوع الشفت <select value={openingShiftType} onChange={e=>setOpeningShiftType(e.target.value as "MORNING"|"EVENING")} disabled={loading}><option value="MORNING">صباحي</option><option value="EVENING">مسائي</option></select></label><p>يمكن البدء والإغلاق بأي وقت؛ مواعيد الجدول للتنظيم فقط.</p>
           <button
             type="button"
             className={
@@ -1480,44 +1433,8 @@ export default function EmployeePortal() {
                   confirmCloseShift
                 }
               >
-                <label
-                  className={
-                    styles.cashField
-                  }
-                >
-                  <span>
-                    الكاش الموجود
-                    فعليًا
-                  </span>
-
-                  <div
-                    className={
-                      styles.cashInputWrap
-                    }
-                  >
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={
-                        actualCash
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        setActualCash(
-                          event.target
-                            .value,
-                        )
-                      }
-                      placeholder="0.000"
-                      autoFocus
-                    />
-
-                    <strong>
-                      د.أ
-                    </strong>
-                  </div>
-                </label>
+                {([{label:"العملات الورقية", value:banknotes, set:setBanknotes}, {label:"العملات المعدنية", value:coins, set:setCoins}]).map((field,index)=><label className={styles.cashField} key={field.label}><span>{field.label}</span><div className={styles.cashInputWrap}><input type="text" inputMode="decimal" value={field.value} onChange={event=>field.set(event.target.value)} placeholder="0.000" autoFocus={index===0} disabled={closeLoading}/><strong>د.أ</strong></div></label>)}
+                <div className={styles.cashField}><span>إجمالي الكاش</span><strong dir="ltr">{countedCash===null?"—":dinars(countedCash)} د.أ</strong></div>
 
                 <label
                   className={
@@ -1560,7 +1477,7 @@ export default function EmployeePortal() {
                     disabled={
                       closeLoading ||
                       !cashConfirmed ||
-                      !actualCash.trim()
+                      countedCash === null || countedCash > 100_000_000
                     }
                   >
                     {closeLoading
@@ -1581,9 +1498,7 @@ export default function EmployeePortal() {
                         false,
                       );
 
-                      setActualCash(
-                        "",
-                      );
+                      setBanknotes(""); setCoins("");
 
                       setCashConfirmed(
                         false,

@@ -84,9 +84,11 @@ export async function getAdminCouponDashboard(cursor?: string) {
     database.collection(SALES).orderBy("createdAt", "desc").limit(60).get(),
   ]);
 
+  const customerNames = new Map<string,string>();
+  await Promise.all([...new Set(inventory.docs.slice(0,100).map(d=>d.data().customerId).filter((id):id is string=>typeof id==="string" && id.length>0))].map(async id=>{const customer=await database.collection("customers").doc(id).get();customerNames.set(id,String(customer.data()?.name??"عميل"));}));
   return {
     priceFils: typeof settings.data()?.priceFils === "number" ? settings.data()!.priceFils as number : null,
-    booklets: inventory.docs.slice(0, 100).map((d) => dto(d.id, d.data() as Booklet)),
+    booklets: inventory.docs.slice(0, 100).map((d) => ({...dto(d.id, d.data() as Booklet), customerName:customerNames.get(d.data().customerId)??null})),
     hasMore: inventory.size > 100,
     nextCursor: inventory.size > 100 ? (inventory.docs[99]?.id ?? null) : null,
     requests: requests.docs.map((d) => {

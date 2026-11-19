@@ -130,6 +130,8 @@ async function handlePOST(
     const result =
       await closeShift({
         shiftId: parsed.data.shiftId,
+        banknotesFils: parsed.data.banknotesFils,
+        coinsFils: parsed.data.coinsFils,
         storeAuthUid:
           storeContext.authUid,
 

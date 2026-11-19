@@ -1,3 +1,5 @@
+import { currentRosterTimes } from "@/lib/employees/roster-repository";
+import { cashCount } from "./cash-count";
 import { prepareDailyWage } from "./daily-wage-repository";
 import { OPERATOR_SESSION_CUTOFFS, operatorSessionCutoffId } from "@/lib/auth/operator-session-cutoff";
 import "server-only";
@@ -6,7 +8,7 @@ import { createHash } from "node:crypto";
 
 import { Timestamp } from "firebase-admin/firestore";
 
-import { DEFAULT_SHIFT_TIMES, settleShiftCash, shiftTimeSnapshot, validWage } from "@/lib/shifts/shift-payroll";
+import { settleShiftCash, shiftTimeSnapshot, validWage } from "@/lib/shifts/shift-payroll";
 
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 
@@ -25,6 +27,8 @@ type ShiftStatus =
   (typeof SHIFT_STATUSES)[keyof typeof SHIFT_STATUSES];
 
 type ShiftRecord = {
+  banknotesFils?: number | null;
+  coinsFils?: number | null;
   wageFilsSnapshot?: number | null;
   wageWorkDay?:string;
   wageSettlement?:"PAID"|"ALREADY_PAID"|"UNCONFIGURED";
@@ -224,6 +228,7 @@ export async function getActiveShift(
 }
 
 export async function startShift(input: {
+  shiftType?: "MORNING" | "EVENING";
   storeAuthUid: string;
 
   employeeId: string;
@@ -317,17 +322,15 @@ export async function startShift(input: {
 
       // Snapshot admin-only terms in the same transaction as opening the shift.
       const wageDocument = await transaction.get(firestore.collection("systemSettings").doc("employeeWage"));
-      const timeDocument = await transaction.get(firestore.collection("systemSettings").doc("employeeShiftTimes"));
+      const times = await currentRosterTimes(transaction, firestore, now.toDate());
       const wage = wageDocument.exists ? wageDocument.data()?.dailyWageFils : null;
       if (wage !== null && !validWage(wage)) throw Error("Invalid wage configuration");
-      const timeRecord = timeDocument.data();
-      const times = timeRecord ? { morningStart: timeRecord.morningStart, morningEnd: timeRecord.morningEnd, eveningStart: timeRecord.eveningStart, eveningEnd: timeRecord.eveningEnd } : DEFAULT_SHIFT_TIMES;
 
       const record: ShiftRecord =
         {
           wageFilsSnapshot: wage,
           payrollVersion: 2,
-          shiftTimeSnapshot: shiftTimeSnapshot(now.toDate(), times),
+          shiftTimeSnapshot: shiftTimeSnapshot(now.toDate(), times, input.shiftType),
 
           storeAuthUid:
             input.storeAuthUid,
@@ -469,8 +472,9 @@ export async function getShiftClosePreview(
 }
 
 export async function closeShift(input: {
-  storeAuthUid: string; employeeId: string; employeeName: string; actualCashFils: number; shiftId: string;
+  storeAuthUid: string; employeeId: string; employeeName: string; actualCashFils: number; banknotesFils?: number; coinsFils?: number; shiftId: string;
 }): Promise<ClosedShiftSummary | null> {
+  const counted = cashCount(input);
   const firestore = getFirebaseAdminFirestore();
   const indexRef = firestore.collection(ACTIVE_STORE_SHIFTS_COLLECTION).doc(getActiveStoreShiftDocumentId(input.storeAuthUid));
   const shiftRef = firestore.collection(SHIFTS_COLLECTION).doc(input.shiftId);
@@ -482,6 +486,7 @@ export async function closeShift(input: {
     // Retrying the original handover cannot close a later shift or charge its wage twice.
     if (shift.status === SHIFT_STATUSES.CLOSED) {
       if (shift.closedByEmployeeId !== input.employeeId || shift.actualCashFils === null || shift.differenceFils === null) return null;
+      if (shift.actualCashFils !== counted.actualCashFils || (counted.banknotesFils !== null && (shift.banknotesFils !== counted.banknotesFils || shift.coinsFils !== counted.coinsFils))) return null;
       return { shiftId: shiftRef.id, expectedCashFils: shift.expectedHandoverFils ?? shift.cashSalesFils, actualCashFils: shift.actualCashFils, differenceFils: shift.differenceFils };
     }
     if (shift.status !== SHIFT_STATUSES.OPEN) return null;
@@ -495,7 +500,7 @@ export async function closeShift(input: {
     transaction.update(shiftRef, {
       status: SHIFT_STATUSES.CLOSED, closedByEmployeeId: input.employeeId,
       closedByEmployeeNameSnapshot: input.employeeName, closedAt: now,
-      actualCashFils: input.actualCashFils, differenceFils, wagePaidFils,
+      ...counted, differenceFils, wagePaidFils,
       payrollVersion:2,wageWorkDay:wage.workDay,wageSettlement:wage.status,dailyWageReceiptId:wage.receiptId,
       expectedHandoverFils: expectedCashFils, updatedAt: now,
     });

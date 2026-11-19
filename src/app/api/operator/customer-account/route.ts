@@ -11,8 +11,8 @@ export async function GET(request:Request) {
     const store=await getStoreSecurityContext();
     if(!await resolveOperatorSession(store.authUid)) return NextResponse.json({success:false,error:{message:"سجّل دخول الموظف."}},{status:401,headers});
     const account=await customerAccount(new URL(request.url).searchParams.get("customerId")??"",store.authUid);
-    const {moneyDueFils,couponsDue,availableCoupons,partial}=account;
-    return NextResponse.json({success:true,data:{moneyDueFils,couponsDue,availableCoupons,partial}},{headers});
+    const {moneyDueFils,couponsDue,availableCoupons,partial,privateBottles}=account;
+    return NextResponse.json({success:true,data:{moneyDueFils,couponsDue,availableCoupons,partial,privateBottles}},{headers});
   } catch(error) {
     if(isSecurityError(error)) return toSecurityResponse(error);
     if(error instanceof ReceivableError) return NextResponse.json({success:false,error:{message:error.message}},{status:409,headers});

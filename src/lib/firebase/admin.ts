@@ -1,4 +1,5 @@
 import "server-only";
+import { PREVIEW_PROJECT,requireLocalPreview } from "./preview-config";
 
 import {
   cert,
@@ -12,12 +13,14 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseAdminEnv } from "@/lib/validation/server-env";
 
 export function getFirebaseAdminApp(): App {
+  const preview = requireLocalPreview();
   const existingApp = getApps()[0];
 
   if (existingApp) {
     return existingApp;
   }
 
+  if (preview) return initializeApp({ projectId: PREVIEW_PROJECT });
   const env = getFirebaseAdminEnv();
 
   return initializeApp({

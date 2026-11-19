@@ -11,3 +11,5 @@
 .dialog { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
 .dialog > * { min-width: 0; }
 @media (max-width: 600px) { .dialog { padding: 18px 14px; border-radius: 16px; } }
+
+.cashBreakdown{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.cashBreakdown>div{display:flex;flex-direction:column;gap:12px;background:var(--dash-card,#fff);border:1px solid var(--dash-border,#d6e4f4);border-radius:15px;padding:18px}.cashBreakdown>div>span{font-size:13px}.cashBreakdown>div .money{font-size:22px}@media(max-width:800px){.cashBreakdown{grid-template-columns:repeat(2,minmax(0,1fr))}}

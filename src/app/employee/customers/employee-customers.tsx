@@ -1,4 +1,5 @@
 "use client";
+import { limitJordanPhoneInput,normalizeJordanPhone } from "@/lib/customers/customer-phone";
 import { userMessage } from "@/lib/client/user-message";
 
 import { useEffect, useState } from "react";
@@ -62,7 +63,7 @@ export default function EmployeeCustomers() {
 
   async function saveCustomer() {
     setError("");
-    if (!/^07\d{8}$/.test(phone) || name.trim().length < 2 || address.trim().length < 5) {
+    if (!normalizeJordanPhone(phone) || name.trim().length < 2 || address.trim().length < 5) {
       setError(userMessage("أدخل اسمًا من حرفين على الأقل ورقمًا يبدأ بـ07 وعنوانًا واضحًا."));
       return;
     }
@@ -116,7 +117,7 @@ export default function EmployeeCustomers() {
             <div className={styles.formHeading}><h2>إضافة عميل</h2><button type="button" onClick={() => setShowForm(false)}>إغلاق</button></div>
             <div className={styles.formFields}>
               <label>الاسم الكامل<input value={name} onChange={(event) => setName(event.target.value)} placeholder="اسم العميل" maxLength={100} /></label>
-              <label>رقم الهاتف<input dir="ltr" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="07XXXXXXXX" /></label>
+              <label>رقم الهاتف<input dir="ltr" type="tel" onPaste={event=>{event.preventDefault();setPhone(limitJordanPhoneInput(event.clipboardData.getData("text")));}} maxLength={14} inputMode="tel" value={phone} onChange={(event) => setPhone(limitJordanPhoneInput(event.target.value))} placeholder="07XXXXXXXX" /></label>
               <label className={styles.wide}>عنوان التوصيل<input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="المنطقة، الشارع، رقم المنزل..." maxLength={250}/></label>
             </div>
             <button type="button" disabled={saving} className={styles.primary} onClick={() => void saveCustomer()}>{saving ? "جاري الحفظ..." : "حفظ العميل"}</button>

@@ -1,4 +1,7 @@
 "use client";
+import { limitJordanPhoneInput,normalizeJordanPhone } from "@/lib/customers/customer-phone";
+import { privateBottlePlan } from "@/lib/customers/private-bottle-plan";
+import { deliveryPaymentPlan } from "@/lib/orders/payment-plan";
 import { userMessage } from "@/lib/client/user-message";
 import { customerDeliveryUnitPrice } from "@/lib/customers/delivery-pricing";
 import { newRequestId } from "@/lib/client/request-id";
@@ -33,6 +36,7 @@ type BottleOrigin = "JORDANIAN" | "SAUDI";
 type BottleOriginCounts = Record<BottleOrigin, number>;
 
 type SelectedOrderItem = {
+  personalBottleQuantity?: number;
   lineKey: string;
   productId: string;
   name: string;
@@ -252,13 +256,13 @@ const categoryOptions: Array<{
   value: "ALL" | ProductCategory;
   label: string;
 }> = [
-  { value: "ALL", label: "جميع المنتجات" },
   { value: "REFILL", label: "تعبئة" },
-  { value: "NEW_BOTTLE", label: "قوارير جديدة" },
   { value: "CUPS", label: "أكواب" },
+  { value: "NEW_BOTTLE", label: "قوارير" },
   { value: "SHRINK", label: "شرنك" },
   { value: "COOLED", label: "مبرد" },
   { value: "OTHER", label: "أخرى" },
+  { value: "ALL", label: "الكل" },
 ];
 
 const paymentOptions: Array<{
@@ -331,20 +335,25 @@ export default function DeliveryOrderForm({
     paymentState: string;
     pendingCouponQuantity: number;
   } | null>(null);
+  const [confirmedShortages,setConfirmedShortages]=useState<Record<string,string>>({});
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const paymentTouched = useRef(false);
+  const [remainderMethod,setRemainderMethod]=useState<"CASH"|"CLICK">("CASH");
   const requestIdRef = useRef<string | null>(null);
   const prefilledRef = useRef(false);
 
   // Preselect only a public customer record from the protected operator API.
   // Fetch only protected account totals for the employee, never its history.
-  const [account,setAccount]=useState<{id:string;moneyDueFils:number;couponsDue:number;availableCoupons:number;partial:boolean}|null>(null);
+  const [account,setAccount]=useState<{id:string;moneyDueFils:number;couponsDue:number;availableCoupons:number;partial:boolean;privateBottles?:Array<{origin:string;sizeMl:number;owned:number;reserved:number}>}|null>(null);
   const [accountError,setAccountError]=useState("");
+  const [accountRevision,setAccountRevision]=useState(0);
   useEffect(()=>{
     if(!selectedCustomer) return;
     const id=selectedCustomer.id, controller=new AbortController();
     const endpoint=mode==="admin" ? "/api/admin/customers/"+encodeURIComponent(id)+"/receivables" : "/api/operator/customer-account?customerId="+encodeURIComponent(id);
-    fetch(endpoint,{cache:"no-store",signal:controller.signal}).then(async response=>{const result=await response.json();if(!response.ok||!result.success) throw Error(result.error?.message??"تعذّر تحميل رصيد العميل.");if(!controller.signal.aborted){setAccount({...result.data,id});setAccountError("");}}).catch(error=>{if(!controller.signal.aborted){setAccountError(error instanceof Error?error.message:"تعذّر تحميل الرصيد.");setAccount(null);}});
+    fetch(endpoint,{cache:"no-store",signal:controller.signal}).then(async response=>{const result=await response.json();if(!response.ok||!result.success) throw Error(result.error?.message??"تعذّر تحميل رصيد العميل.");if(!controller.signal.aborted){setAccount({...result.data,id});if(!paymentTouched.current)setPaymentMethod(result.data.availableCoupons>0?"COUPON":"CASH");setAccountError("");}}).catch(error=>{if(!controller.signal.aborted){setAccountError(error instanceof Error?error.message:"تعذّر تحميل الرصيد.");setAccount(null);}});
     return ()=>controller.abort();
-  },[selectedCustomer,mode]);
+  },[selectedCustomer,mode,accountRevision]);
   useEffect(() => {
     if (prefilledRef.current) return;
     prefilledRef.current = true;
@@ -362,7 +371,11 @@ export default function DeliveryOrderForm({
         }
         if (controller.signal.aborted) return;
         const customer = data.data.customers[0] as CustomerChoice;
-        setSelectedCustomer(customer);
+        setConfirmedShortages({});
+    paymentTouched.current=false;
+    setPaymentMethod("CASH");
+    setAccount(null);
+    setSelectedCustomer(customer);
         setPhone(customer.phone);
         setCustomerName(customer.name);
         setAddress(customer.primaryAddress);
@@ -410,7 +423,7 @@ export default function DeliveryOrderForm({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<
     "ALL" | ProductCategory
-  >("ALL");
+  >("REFILL");
 
   const [cart, setCart] = useState<
     Record<string, number>
@@ -423,8 +436,6 @@ export default function DeliveryOrderForm({
     Record<string, BottleOriginCounts>
   >({});
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("CASH");
 
   const [
     newBookletRequested,
@@ -506,6 +517,13 @@ export default function DeliveryOrderForm({
     [products, cart, bottleOrigins],
   );
 
+  const privateLines=selectedProducts.map(item=>({category:products.find(p=>p.id===item.productId)!.category,quantity:item.quantity,bottleOrigin:item.bottleOrigin,bottleSizeMl:products.find(p=>p.id===item.productId)?.bottleSizeMl??20000}));
+  const ownershipRows=account?.id===selectedCustomer?.id?account?.privateBottles??[]:[];
+  const privateUsage=privateBottlePlan(privateLines,ownershipRows as Parameters<typeof privateBottlePlan>[1]);
+  const shortages=selectedProducts.flatMap((item,index)=>privateUsage[index].shortage>0?[{...item,...privateUsage[index]}]:[]);
+  const shortageKey=(line:typeof shortages[number])=>[line.quantity,line.personalBottleQuantity,line.shortage].join(":");
+  const allShortagesConfirmed=shortages.every(line=>confirmedShortages[line.lineKey]===shortageKey(line));
+  const paymentPlan=deliveryPaymentPlan(selectedProducts.map(item=>({category:products.find(p=>p.id===item.productId)!.category,quantity:item.quantity,unitPriceFils:item.deliveryPriceFils})),account?.id===selectedCustomer?.id?account?.availableCoupons??0:0,paymentMethod==="COUPON");
   const itemCount = selectedProducts.reduce(
     (total, item) => total + item.quantity,
     0,
@@ -519,7 +537,7 @@ export default function DeliveryOrderForm({
       0,
     );
 
-  const phoneValid = /^07\d{8}$/.test(phone);
+  const phoneValid = normalizeJordanPhone(phone)!==null;
 
   const customerReady =
     selectedCustomer !== null &&
@@ -566,6 +584,7 @@ export default function DeliveryOrderForm({
   ];
 
   function chooseCustomer(customer: CustomerChoice) {
+    setConfirmedShortages({});paymentTouched.current=false;setPaymentMethod("CASH");setAccount(null);setAccountError("");
     setSelectedCustomer(customer);
     setPhone(customer.phone);
     setCustomerName(customer.name);
@@ -578,6 +597,7 @@ export default function DeliveryOrderForm({
   }
 
   function switchCustomer() {
+    setConfirmedShortages({});paymentTouched.current=false;setPaymentMethod("CASH");setAccount(null);setAccountError("");
     setSelectedCustomer(null);
     setPhone("");
     setCustomerName("");
@@ -589,7 +609,7 @@ export default function DeliveryOrderForm({
 
   async function createNewCustomer() {
     setCustomerError("");
-    if (!/^07\d{8}$/.test(phone) || customerName.trim().length < 2 || address.trim().length < 5) {
+    if (!normalizeJordanPhone(phone) || customerName.trim().length < 2 || address.trim().length < 5) {
       setCustomerError(userMessage("أدخل رقم هاتف صحيحًا واسمًا وعنوانًا كاملين."));
       return;
     }
@@ -614,7 +634,7 @@ export default function DeliveryOrderForm({
 
   async function saveOrder() {
     setOrderError("");
-    if (!selectedCustomer || !customerReady || itemCount === 0) {
+    if (!selectedCustomer || !customerReady || itemCount === 0 || !allShortagesConfirmed) {
       setOrderError(userMessage("اختر العميل، وأكمل العنوان، وأضف المنتجات أولًا."));
       return;
     }
@@ -631,11 +651,16 @@ export default function DeliveryOrderForm({
           address: address.trim(),
           notes: notes.trim(),
           paymentMethod,
+          remainderMethod,
+          expectedCouponQuantity: paymentMethod==="COUPON" ? paymentPlan.couponQuantity : 0,
           newBookletRequested,
-          items: selectedProducts.map((item) => ({
+          items: selectedProducts.map((item,index) => ({
             productId: item.productId,
             quantity: item.quantity,
             bottleOrigin: item.bottleOrigin,
+            personalBottleQuantity: privateUsage[index].personalBottleQuantity,
+            expectedPrivateBottleQuantity: privateUsage[index].personalBottleQuantity,
+            storeBottleShortageConfirmed: shortages.some(line=>line.lineKey===item.lineKey&&confirmedShortages[line.lineKey]===shortageKey(line)),
           })),
         }),
       });
@@ -978,21 +1003,16 @@ export default function DeliveryOrderForm({
                     </span>
 
                     <input
-                      type="tel"
+                      type="tel" onPaste={event=>{event.preventDefault();setPhone(limitJordanPhoneInput(event.clipboardData.getData("text")));}}
+                  maxLength={14}
                       inputMode="numeric"
                       autoComplete="tel"
                       dir="ltr"
                       placeholder="07XXXXXXXX"
-                      maxLength={10}
                       readOnly={selectedCustomer !== null}
                       value={phone}
                       onChange={(event) =>
-                        setPhone(
-                          event.target.value.replace(
-                            /\D/g,
-                            "",
-                          ),
-                        )
+                        setPhone(limitJordanPhoneInput(event.target.value))
                       }
                     />
                   </div>
@@ -1370,6 +1390,7 @@ export default function DeliveryOrderForm({
                 طريقة الدفع
               </div>
 
+              {shortages.length>0&&<div className={styles.couponInfo} role="status"><div><strong>عدد القوارير الخاصة لا يغطي كامل الطلب</strong>{shortages.map(line=><label key={line.lineKey} style={{display:"block",marginBlock:10}}><input type="checkbox" checked={confirmedShortages[line.lineKey]===shortageKey(line)} onChange={e=>setConfirmedShortages({...confirmedShortages,[line.lineKey]:e.target.checked?shortageKey(line):""})}/> {line.name}: استخدام {line.personalBottleQuantity} من قوارير العميل، وتغطية {line.shortage} من قوارير المحل.</label>)}</div></div>}
               <div className={styles.paymentGrid}>
                 {paymentOptions.map((option) => {
                   const active =
@@ -1385,11 +1406,7 @@ export default function DeliveryOrderForm({
                           : styles.paymentOption
                       }
                       aria-pressed={active}
-                      onClick={() =>
-                        setPaymentMethod(
-                          option.value,
-                        )
-                      }
+                      onClick={() => {paymentTouched.current=true;setPaymentMethod(option.value);}}
                     >
                       <span
                         className={styles.paymentIcon}
@@ -1422,7 +1439,8 @@ export default function DeliveryOrderForm({
                 })}
               </div>
 
-              {paymentMethod === "COUPON" && selectedCustomer && account?.id===selectedCustomer.id && <p role="status">الكوبونات المتاحة: {account.availableCoupons}{itemCount>account.availableCoupons ? ` — ينقص الطلب ${itemCount-account.availableCoupons} كوبون. يمكن حفظه وإبلاغ العميل.` : ""}{account.partial?" — الرصيد المعروض جزئي":""}</p>}
+              {selectedCustomer && account?.id===selectedCustomer.id && <p role="status">{account.availableCoupons>0?"لدى العميل كوبونات نشطة":"لا يوجد رصيد كوبونات متاح"} — المتاح: {account.availableCoupons}</p>}
+              {paymentMethod === "COUPON" && <div role="status" className={styles.couponInfo}><div><strong>{paymentPlan.shortage>0 ? "الكوبونات غير كافية لتغطية كامل التعبئة" : "توزيع الدفع"}</strong><p>{paymentPlan.couponQuantity} كوبون + {formatMoney(paymentPlan.moneyDueFils)} {remainderMethod==="CASH"?"كاش":"كليك"}</p>{paymentPlan.moneyDueFils>0&&<label>دفع المبلغ المتبقي <select value={remainderMethod} onChange={e=>setRemainderMethod(e.target.value as "CASH"|"CLICK")}><option value="CASH">كاش</option><option value="CLICK">كليك / تحويل</option></select></label>}</div></div>}
               {paymentMethod === "COUPON" && accountError && <p role="status">{accountError} يمكن حفظ الطلب والتحقق من النقص عند الحفظ.</p>}
               {paymentMethod === "COUPON" && (
                 <div className={styles.couponInfo}>
@@ -1687,12 +1705,13 @@ export default function DeliveryOrderForm({
 
 
               {orderError && (
-                <div className={styles.formError} role="alert">{orderError}</div>
+                <div className={styles.formError} role="alert">{orderError}<button type="button" disabled={savingOrder} onClick={()=>{setAccount(null);setAccountRevision(value=>value+1);}}>تحديث بيانات العميل</button></div>
               )}
+              {paymentMethod === "COUPON" && <p role="status">{paymentPlan.shortage>0?"تنبيه: رصيد الكوبونات لا يغطي كامل الطلب. ":""}التأكيد: {paymentPlan.couponQuantity} كوبون + {formatMoney(paymentPlan.moneyDueFils)} {remainderMethod==="CASH"?"كاش":"كليك"}.</p>}
               <button
                 type="button"
                 className={styles.submitButton}
-                disabled={savingOrder || !customerReady || !productsReady}
+                disabled={savingOrder || !customerReady || !productsReady || !allShortagesConfirmed || (!!selectedCustomer&&account?.id!==selectedCustomer.id&&!accountError)}
                 onClick={saveOrder}
               >
                 <Icon name="check" size={19} />

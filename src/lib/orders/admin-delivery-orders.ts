@@ -1,3 +1,5 @@
+import { preparePrivateBottles } from "@/lib/customers/private-bottles";
+import { orderMoneyDue, orderMoneyMethod } from "./payment-plan";
 import { openOrderReceivable } from "@/lib/receivables/records";
 import { customerSearchDirectory } from "./customer-search-directory";
 import { normalizeOrderSearch, orderNameMatches, usefulOrderSearch } from "./order-search";
@@ -48,6 +50,9 @@ type StoredOrder = {
   employeeId?: string;
   employeeNameSnapshot?: string;
   items?: Array<{
+    saleUnitSnapshot?: string;
+    personalBottleQuantity?: number;
+    bottleSizeMl?: number;
     productId: string;
     productNameSnapshot: string;
     category: string;
@@ -59,6 +64,9 @@ type StoredOrder = {
   itemCount?: number;
   totalFils: number;
   paymentMethod: "CASH" | "CLICK" | "COUPON";
+  moneyDueFils?: number;
+  couponValueFils?: number;
+  remainderMethod?: "CASH" | "CLICK";
   paymentState: string;
   collectedFils?: number;
   couponQuantity?: number;
@@ -95,8 +103,11 @@ function toDto(id: string, order: StoredOrder) {
     notes: order.notes ?? "",
     createdBy: order.employeeNameSnapshot ?? "غير محدد",
     items: (order.items ?? []).map((item) => ({
+      saleUnit: item.saleUnitSnapshot ?? "",
+      bottleSizeMl: item.bottleSizeMl,
+      category: item.category,
+      personalBottleQuantity: item.personalBottleQuantity ?? 0,
       name: item.productNameSnapshot ?? "منتج",
-      category: item.category ?? "",
       origin: item.bottleOrigin ?? null,
       quantity: item.quantity ?? 0,
       unitPriceFils: item.unitPriceFils ?? 0,
@@ -104,6 +115,7 @@ function toDto(id: string, order: StoredOrder) {
     })),
     itemCount: order.itemCount ?? 0,
     totalFils: order.totalFils ?? 0,
+    moneyDueFils: orderMoneyDue(order), remainderMethod: orderMoneyMethod(order),
     paymentMethod: order.paymentMethod ?? "CASH",
     paymentState: order.paymentState ?? "",
     collectedFils: order.collectedFils ?? 0,
@@ -264,7 +276,7 @@ export async function changeAdminDeliveryOrderStatus(
 
     if (action === "DELIVERED" && input.paymentCollected && input.paymentDeferred) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "اختر حالة تحصيل واحدة.");
     if (action === "DELIVERED" && (!Number.isSafeInteger(order.totalFils) || order.totalFils < 0)) throw new DeliveryOrderBusinessError("INVALID_AMOUNT", "قيمة الطلب غير صالحة.");
-    if (input.paymentDeferred && (action !== "DELIVERED" || order.paymentMethod === "COUPON")) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
+    if (input.paymentDeferred && (action !== "DELIVERED" || orderMoneyDue(order) === 0)) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
     const allocations = order.couponAllocations ?? [];
     const neededBooklets = action === "CANCELLED" || (action === "DELIVERED" && order.paymentMethod === "COUPON");
     const bookletDocs = neededBooklets
@@ -272,30 +284,14 @@ export async function changeAdminDeliveryOrderStatus(
       : [];
 
     let shiftRef: FirebaseFirestore.DocumentReference | null = null;
-    if (action === "DELIVERED" && order.paymentMethod !== "COUPON" && !input.paymentDeferred) {
-      if ((!input.paymentCollected && !input.paymentDeferred) || (input.paymentCollected && input.paymentDeferred)) {
-        throw new DeliveryOrderBusinessError("PAYMENT_REQUIRED", "يجب تأكيد تسلّم قيمة الطلب قبل تسجيل التسليم.");
-      }
-      if (!order.shiftId || !order.storeAuthUid) {
-        throw new DeliveryOrderBusinessError("SHIFT_MISSING", "تعذر تحديد شفت الطلب. يلزم مراجعة الإدارة المالية.");
-      }
-      const indexRef = db.collection(ACTIVE_STORE_SHIFTS_COLLECTION)
-        .doc(getActiveStoreShiftDocumentId(order.storeAuthUid));
-      const indexDoc = await tx.get(indexRef);
-      if (indexDoc.data()?.shiftId !== order.shiftId) {
-        throw new DeliveryOrderBusinessError(
-          "SHIFT_CLOSED", "الشفت الذي يتبعه الطلب لم يعد مفتوحًا. لا يمكن تسجيل التحصيل على شفت مختلف أو مغلق.",
-        );
-      }
-      shiftRef = db.collection("shifts").doc(order.shiftId);
-      const shiftDoc = await tx.get(shiftRef);
-      const shift = shiftDoc.data();
-      if (!shift || shift.status !== SHIFT_STATUSES.OPEN || shift.storeAuthUid !== order.storeAuthUid) {
-        throw new DeliveryOrderBusinessError("SHIFT_CLOSED", "شفت الطلب مغلق أو غير صالح للتحصيل.");
-      }
-      if (!Number.isSafeInteger(order.totalFils) || order.totalFils < 0) {
-        throw new DeliveryOrderBusinessError("INVALID_AMOUNT", "قيمة الطلب غير صالحة.");
-      }
+    if (action === "DELIVERED") {
+      if(orderMoneyDue(order)>0&&!input.paymentCollected&&!input.paymentDeferred)throw new DeliveryOrderBusinessError("PAYMENT_REQUIRED","أكد استلام المبلغ أو إبقاءه على العميل.");
+      const indexDoc=await tx.get(db.collection(ACTIVE_STORE_SHIFTS_COLLECTION).doc(getActiveStoreShiftDocumentId(order.storeAuthUid)));
+      const currentShiftId=indexDoc.data()?.shiftId;
+      if(typeof currentShiftId!=="string")throw new DeliveryOrderBusinessError("NO_SHIFT","يلزم شفت مفتوح لتسجيل التسليم.");
+      shiftRef=db.collection("shifts").doc(currentShiftId);
+      const currentShift=await tx.get(shiftRef);
+      if(currentShift.data()?.status!=="OPEN"||currentShift.data()?.storeAuthUid!==order.storeAuthUid)throw new DeliveryOrderBusinessError("NO_SHIFT","الشفت الحالي غير صالح.");
     }
 
     if (neededBooklets) {
@@ -313,8 +309,10 @@ export async function changeAdminDeliveryOrderStatus(
       }
     }
 
+    const privateBottles=await preparePrivateBottles(tx,db,order.customerId,order.items??[],action,orderId,adminUid);
     const inventory = await prepareInventoryTransition(tx, db, order.inventoryPlan, order.status, action, input.bottleReturns, { operationId: `order:${orderId}:${action}`, actor: { id: adminUid, name: "الإدارة", type: "ADMIN" }, customerId: order.customerId, customerName: order.customerNameSnapshot, orderId });
     inventory.commit();
+    privateBottles.commit();
     // ALL reads completed before any writes. Transaction retry safely prevents
     // double settlement if an employee or another admin clicks simultaneously.
     const now = Timestamp.now();
@@ -373,23 +371,18 @@ export async function changeAdminDeliveryOrderStatus(
         if ((order.pendingCouponQuantity ?? 0) > 0) openOrderReceivable(tx, db, orderId, order, now, "COUPON", order.pendingCouponQuantity!);
         patch.paymentState = (order.pendingCouponQuantity ?? 0) > 0
           ? "AWAITING_BOOKLET_APPROVAL" : "COUPONS_SETTLED";
-      } else if (input.paymentDeferred && order.totalFils > 0) {
+      }
+      patch.deliveredShiftId = shiftRef?.id ?? null;
+      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(order.totalFils),cashSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
+      if (input.paymentDeferred && orderMoneyDue(order) > 0) {
         patch.paymentState = "PAYMENT_DUE"; patch.collectedFils = 0; patch.collectionMode = "RECEIPTS";
-        openOrderReceivable(tx, db, orderId, order, now, "MONEY", order.totalFils);
-      } else {
+        openOrderReceivable(tx, db, orderId, { ...order, totalFils: orderMoneyDue(order) }, now, "MONEY", orderMoneyDue(order));
+      } else if (orderMoneyDue(order) > 0) {
         patch.paymentState = "COLLECTED";
         patch.collectedAt = now;
         patch.collectedByAdminUid = adminUid;
-        patch.collectedFils = order.totalFils;
-        if (shiftRef) {
-          tx.update(shiftRef, {
-            saleCount: FieldValue.increment(1),
-            totalSalesFils: FieldValue.increment(order.totalFils),
-            cashSalesFils: FieldValue.increment(order.paymentMethod === "CASH" ? order.totalFils : 0),
-            clickSalesFils: FieldValue.increment(order.paymentMethod === "CLICK" ? order.totalFils : 0),
-            updatedAt: now,
-          });
-        }
+        patch.collectedFils = orderMoneyDue(order);
+
       }
     }
     tx.update(orderRef, patch);

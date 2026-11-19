@@ -11,7 +11,6 @@ import {
   getEmployeeAuthRecord,
   listActiveEmployees,
 } from "@/lib/employees/employee-repository";
-import { getEmployeeCurrentScheduleAccess } from "@/lib/employees/employee-schedule-repository";
 import { reservePinVerification,clearSuccessfulPinVerification } from "@/lib/security/pin-verification-attempt";
 import { verifyEmployeePin } from "@/lib/security/employee-pin";
 import { getStoreSecurityContext } from "@/lib/security/get-store-security-context";
@@ -230,36 +229,7 @@ async function handlePOST(
       );
     }
 
-    /*
-     * نتحقق أولًا أن الموظف
-     * داخل وقت الدوام المسموح.
-     */
-    const initialScheduleAccess =
-      await getEmployeeCurrentScheduleAccess(
-        employee.id,
-      );
-
-    if (
-      !initialScheduleAccess.allowed
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error: {
-            code:
-              "OUTSIDE_SCHEDULE",
-
-            message:
-              "غير مسموح لك بالدخول الآن. لا يوجد دوام مجدول لك في هذا الوقت.",
-          },
-        },
-        {
-          status: 403,
-        },
-      );
-    }
-
+    // Active employees may start early or finish late; the PIN is still verified.
     const lockState =
       await reservePinVerification(
         storeContext.authUid,
@@ -317,39 +287,6 @@ async function handlePOST(
             failure.locked
               ? 429
               : 401,
-        },
-      );
-    }
-
-    /*
-     * نفحص الجدول مرة ثانية
-     * بعد التحقق من PIN.
-     *
-     * هذا يمنع إنشاء جلسة لو انتهى
-     * وقت الدوام أثناء عملية التحقق.
-     */
-    const finalScheduleAccess =
-      await getEmployeeCurrentScheduleAccess(
-        employee.id,
-      );
-
-    if (
-      !finalScheduleAccess.allowed
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error: {
-            code:
-              "OUTSIDE_SCHEDULE",
-
-            message:
-              "انتهى وقت الدوام المسموح لهذا الموظف.",
-          },
-        },
-        {
-          status: 403,
         },
       );
     }

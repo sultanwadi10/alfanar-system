@@ -1,0 +1,10 @@
+import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+const root=path.resolve(import.meta.dirname,"../.."),config=JSON.parse(readFileSync(path.join(root,".preview-tools.local.json"),"utf8"));
+const env={...process.env,JAVA_HOME:config.javaHome,XDG_CONFIG_HOME:config.configHome,FIREBASE_EMULATORS_PATH:config.emulatorCache,FIREBASE_CLI_DISABLE_TELEMETRY:"1",CI:"true",OPERATIONAL_EMULATOR_HOST:"127.0.0.1:8180"};
+const pathKey=Object.keys(env).find(key=>key.toLowerCase()==="path")??"PATH";
+env[pathKey]=path.join(config.javaHome,"bin")+path.delimiter+(env[pathKey]??"");
+delete env.GOOGLE_APPLICATION_CREDENTIALS;
+const child=spawn(process.execPath,[config.firebaseCli,"emulators:exec","--project","demo-alfanar-checks","--only","firestore","--config",path.join(root,"scripts/tests/firebase-operational.json"),"node scripts/tests/operational-emulator.test.mjs"],{cwd:root,env,stdio:"inherit"});
+child.on("error",error=>{console.error(error.message);process.exitCode=1;});child.on("exit",code=>{process.exitCode=code??1;});

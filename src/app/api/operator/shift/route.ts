@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { withOperationChanges } from "@/lib/updates/operation-changes";
 import { NextResponse } from "next/server";
 
@@ -192,8 +193,12 @@ async function handlePOST(
       );
     }
 
+    const body=await request.json().catch(()=>({}));
+    const parsed=z.object({shiftType:z.enum(["MORNING","EVENING"]).optional()}).strict().safeParse(body);
+    if(!parsed.success)return NextResponse.json({success:false,error:{message:"اختر نوع الشفت."}},{status:400});
     const shift =
       await startShift({
+        shiftType:parsed.data.shiftType,
         storeAuthUid:
           storeContext.authUid,
 

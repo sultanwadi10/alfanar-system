@@ -1,4 +1,5 @@
 "use client";
+import { limitJordanPhoneInput,normalizeJordanPhone } from "@/lib/customers/customer-phone";
 import { userMessage } from "@/lib/client/user-message";
 import { useTransientMessage } from "@/lib/client/use-transient-message";
 import { useConfirmation } from "@/lib/client/use-confirmation";
@@ -173,6 +174,7 @@ export function CustomersManager({
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+    if(!normalizeJordanPhone(phone)){setErrorMessage(userMessage("أدخل رقم هاتف أردني صحيحًا ومكتملًا."));return;}
 
     setLoading(true);
     setErrorMessage("");
@@ -943,15 +945,13 @@ export function CustomersManager({
                 رقم الهاتف
 
                 <input
-                  type="tel"
+                  type="tel" onPaste={event=>{event.preventDefault();setPhone(limitJordanPhoneInput(event.clipboardData.getData("text")));}}
+                  maxLength={14}
                   value={phone}
                   onChange={(
                     event,
                   ) =>
-                    setPhone(
-                      event.target
-                        .value,
-                    )
+                    setPhone(limitJordanPhoneInput(event.target.value))
                   }
                   placeholder="07XXXXXXXX"
                   autoComplete="tel"

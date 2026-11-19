@@ -12,6 +12,7 @@ const navigation: Array<{ href: string; label: string; icon: AlfanarIconName; gr
   { href: "/admin", label: "لوحة التحكم", icon: "grid" },
   { href: "/admin/orders", label: "الطلبات", icon: "cart" },
   { href: "/admin/customers", label: "العملاء", icon: "users" },
+  { href: "/admin/receivables", label: "مستحقات العملاء", icon: "coins" },
   { href: "/admin/coupons", label: "الكوبونات", icon: "ticket" },
   { href: "/admin/pricing", label: "الأصناف والأسعار", icon: "tag", group: "البضاعة والتشغيل" },
   { href: "/admin/inventory", label: "المخزون", icon: "package" },

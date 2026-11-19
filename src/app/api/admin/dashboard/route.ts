@@ -8,9 +8,9 @@ const headers = { "Cache-Control": "private, no-store" };
 export async function GET(request: Request) {
   try {
     await getAdminSecurityContext();
-    const period = new URL(request.url).searchParams.get("period") ?? "today";
-    if (period !== "today" && period !== "yesterday" && period !== "week") return NextResponse.json({ success: false, error: { message: "الفترة غير صالحة." } }, { status: 400, headers });
-    return NextResponse.json({ success: true, data: await getDashboardOverview(period) }, { headers });
+    const period = new URL(request.url).searchParams.get("period") ?? "shift";
+    if (period !== "shift" && period !== "today" && period !== "yesterday" && period !== "week") return NextResponse.json({ success: false, error: { message: "الفترة غير صالحة." } }, { status: 400, headers });
+    return NextResponse.json({ success: true, data: await getDashboardOverview(period, new Date(), undefined, new URL(request.url).searchParams.get("shiftId") ?? undefined) }, { headers });
   } catch (error) {
     if (isSecurityError(error)) return toSecurityResponse(error);
     console.error("Dashboard overview failed", error);

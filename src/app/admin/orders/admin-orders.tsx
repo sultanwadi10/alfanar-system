@@ -1,4 +1,5 @@
 "use client";
+import { orderItemSummary } from "@/lib/orders/order-item-summary";
 import { userMessage } from "@/lib/client/user-message";
 import { useTransientMessage } from "@/lib/client/use-transient-message";
 import { usefulOrderSearch } from "@/lib/orders/order-search";
@@ -33,6 +34,9 @@ type Order = {
   notes: string;
   createdBy: string;
   items: Array<{
+    saleUnit?:string;
+    bottleSizeMl?:number;
+    personalBottleQuantity?: number;
     name: string;
     category: string;
     origin: "JORDANIAN" | "SAUDI" | null;
@@ -43,6 +47,8 @@ type Order = {
   itemCount: number;
   totalFils: number;
   paymentMethod: Method;
+  moneyDueFils?: number;
+  remainderMethod?: string;
   paymentState: string;
   collectedFils: number;
   couponQuantity: number;
@@ -235,7 +241,7 @@ export default function AdminOrders() {
     delivered: orders.filter((o) => o.status === "DELIVERED").length,
     cancelled: orders.filter((o) => o.status === "CANCELLED").length,
     due: orders.filter((o) => o.status !== "CANCELLED" && ["DUE_ON_DELIVERY","PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(o.paymentState))
-      .reduce((sum, o) => sum + Math.max(0,o.totalFils-o.collectedFils), 0),
+      .reduce((sum, o) => sum + Math.max(0,(o.moneyDueFils ?? (o.paymentMethod==="COUPON"?0:o.totalFils))-o.collectedFils), 0),
     collected: orders.filter((o) => ["COLLECTED","PARTIALLY_COLLECTED"].includes(o.paymentState))
       .reduce((sum, o) => sum + o.collectedFils, 0),
   }), [orders]);
@@ -277,7 +283,7 @@ export default function AdminOrders() {
   async function executeAction() {
     if (!selected || !pending || busy) return;
 
-    if (pending === "DELIVERED" && selected.paymentMethod !== "COUPON" && !paymentConfirmed && !paymentDeferred) {
+    if (pending === "DELIVERED" && (selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) > 0 && !paymentConfirmed && !paymentDeferred) {
       setError(userMessage("اختر حالة التحصيل أولًا."));
       return;
     }
@@ -290,7 +296,7 @@ export default function AdminOrders() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pending === "CANCELLED"
           ? { action: "CANCELLED", reason: "إلغاء الطلب من الإدارة" }
-          : { action: "DELIVERED", bottleReturns, paymentCollected: selected.paymentMethod === "COUPON" ? false : paymentConfirmed, paymentDeferred: selected.paymentMethod !== "COUPON" && paymentDeferred }),
+          : { action: "DELIVERED", bottleReturns, paymentCollected: (selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) === 0 ? false : paymentConfirmed, paymentDeferred: (selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) > 0 && paymentDeferred }),
       });
       const result = await response.json() as Result;
       if (!response.ok || !result.success) throw new Error(errorMessage(result));
@@ -399,6 +405,7 @@ export default function AdminOrders() {
                 </div>
                 <div className={styles.customerName}>{order.customerName}</div>
                 <div className={styles.cardDetail}>{order.address}</div>
+                <div className={styles.cardDetail}>{order.items.map(orderItemSummary).join(" · ")}</div>
                 <div className={styles.cardBottom}>
                   <span>{dateTime(order.createdAt)}</span>
                   <b>{money(order.totalFils)}</b>
@@ -438,13 +445,13 @@ export default function AdminOrders() {
                 {selected.notes && <div className={styles.noteBox}><b>ملاحظات التوصيل:</b> {selected.notes}</div>}
               </div>
               <section className={styles.detailSection}>
-                <div className={styles.sectionHead}><h3>تفاصيل المنتجات</h3><span>{selected.itemCount} قطعة</span></div>
+                <div className={styles.sectionHead}><h3>تفاصيل المنتجات</h3><span>الأصناف: {selected.items.length}</span></div>
                 <div className={styles.itemList}>
                   {selected.items.map((item, i) => (
                     <div key={`${i}-${item.name}`} className={styles.itemRow}>
                       <div>
                         <b>{item.name}{item.origin === "JORDANIAN" ? " — أردني" : item.origin === "SAUDI" ? " — سعودي" : ""}</b>
-                        <small>{item.quantity} × {money(item.unitPriceFils)}</small>
+                        <small>{item.quantity} × {money(item.unitPriceFils)}{(item.personalBottleQuantity??0)>0&&<> · {item.personalBottleQuantity} من قوارير العميل الخاصة — بدون عهدة</>}</small>
                       </div>
                       <strong>{money(item.lineTotalFils)}</strong>
                     </div>
@@ -457,7 +464,7 @@ export default function AdminOrders() {
                 <div className={styles.infoGrid}>
                   <div><span>طريقة الدفع</span><b>{paymentLabels[selected.paymentMethod] ?? selected.paymentMethod}</b></div>
                   <div><span>حالة التحصيل</span><b>{paymentStateLabels[selected.paymentState] ?? selected.paymentState}</b></div>
-                  {selected.paymentMethod !== "COUPON" && <div><span>مبلغ تم تحصيله</span><b>{money(selected.collectedFils)}</b></div>}
+                  {(selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) > 0 && <div><span>مبلغ تم تحصيله</span><b>{money(selected.collectedFils)}</b></div>}
                   {selected.paymentMethod === "COUPON" && <>
                     <div><span>الكوبونات المطلوبة</span><b>{selected.couponQuantity}</b></div>
                     <div><span>المحجوزة من دفاتر نشطة</span><b>{selected.reservedCouponQuantity}</b></div>
@@ -504,23 +511,23 @@ export default function AdminOrders() {
           <div className={styles.modalTop}><h2 id="modalTitle">{pending === "DELIVERED" ? "تأكيد تسليم الطلب" : "إلغاء طلب التوصيل"}</h2><button type="button" aria-label="إغلاق" disabled={busy} onClick={() => setPending(null)}>×</button></div>
           <p>طلب <b>#{selected.number}</b> — {selected.customerName}</p>
           {pending === "CANCELLED" ? <>
-            <p className={styles.modalHelp}>سيُلغى الطلب. مواد التعبئة المستهلكة لا تعود للمخزون.</p>
+            <p className={styles.modalHelp}>أكد رجوع البضاعة للمحل قبل الإلغاء. القوارير والبضاعة المجهزة تذهب للمراجعة؛ مواد التعبئة المستهلكة لا تعود للمخزون.</p>
 
           </> : <>
             <div className={styles.amountBox}>إجمالي الطلب <strong>{money(selected.totalFils)}</strong></div>
-            {selected.paymentMethod === "COUPON"
+            {(selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) === 0
               ? <p className={styles.modalHelp}>سيتم خصم الكوبونات المحجوزة.</p>
               : <label className={styles.checkboxField}>
                   <input type="radio" name="adminCollection" checked={paymentConfirmed} onChange={() => {setPaymentConfirmed(true);setPaymentDeferred(false);}} />
-                  أؤكد أنه تم تسليم الطلب واستلام المبلغ بواسطة {paymentLabels[selected.paymentMethod]}.
+                  أؤكد تسليم الطلب واستلام {money(selected.moneyDueFils ?? selected.totalFils)} بواسطة {selected.remainderMethod==="CLICK"||selected.paymentMethod==="CLICK"?"كليك":"كاش"}.
                 </label>}
-            {selected.paymentMethod !== "COUPON" && <label className={styles.checkboxField}><input type="radio" name="adminCollection" checked={paymentDeferred} onChange={()=>{setPaymentDeferred(true);setPaymentConfirmed(false);}}/> تم تسليم الطلب والمبلغ باقي على العميل</label>}
+            {(selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) > 0 && <label className={styles.checkboxField}><input type="radio" name="adminCollection" checked={paymentDeferred} onChange={()=>{setPaymentDeferred(true);setPaymentConfirmed(false);}}/> تم تسليم الطلب والمبلغ باقي على العميل</label>}
           </>}
           {error && <div className={styles.error} role="alert">{error}</div>}
           <div className={styles.modalButtons}>
             <button type="button" className={styles.neutralButton} disabled={busy} onClick={() => { setPending(null); setError(""); }}>رجوع</button>
             <button type="button" className={pending === "CANCELLED" ? styles.cancelButton : styles.deliverButton}
-              disabled={busy || (pending === "CANCELLED" ? false : selected.paymentMethod !== "COUPON" && !paymentConfirmed && !paymentDeferred)}
+              disabled={busy || (pending === "CANCELLED" ? false : (selected.moneyDueFils ?? (selected.paymentMethod === "COUPON" ? 0 : selected.totalFils)) > 0 && !paymentConfirmed && !paymentDeferred)}
               onClick={() => void executeAction()}>{busy ? "جارٍ الحفظ…" : pending === "CANCELLED" ? "اعتماد الإلغاء" : "اعتماد التسليم"}</button>
           </div>
         </div>

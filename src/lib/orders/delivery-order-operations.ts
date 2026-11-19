@@ -1,3 +1,5 @@
+import { preparePrivateBottles } from "@/lib/customers/private-bottles";
+import { orderMoneyDue, orderMoneyMethod } from "./payment-plan";
 import { openOrderReceivable } from "@/lib/receivables/records";
 import { prepareInventoryTransition, bottleRequirements } from "@/lib/inventory/stock-engine";
 import type { InventoryPlan, BottleReturn } from "@/types/inventory";
@@ -37,6 +39,9 @@ type OrderRecord = {
   deliveryAddress: string;
   notes: string;
   items: Array<{
+    saleUnitSnapshot?: string;
+    personalBottleQuantity?: number;
+    bottleSizeMl?: number;
     productId: string;
     productNameSnapshot: string;
     category: string;
@@ -48,6 +53,9 @@ type OrderRecord = {
   itemCount: number;
   totalFils: number;
   paymentMethod: "CASH" | "CLICK" | "COUPON";
+  moneyDueFils?: number;
+  couponValueFils?: number;
+  remainderMethod?: "CASH" | "CLICK";
   paymentState: string;
   collectedFils?: number;
   couponAllocations?: CouponAllocation[];
@@ -89,6 +97,10 @@ function toOperatorOrder(id: string, order: OrderRecord) {
     },
     notes: order.notes ?? "",
     items: (order.items ?? []).map((item) => ({
+      saleUnit: item.saleUnitSnapshot ?? "",
+      bottleSizeMl: item.bottleSizeMl,
+      category: item.category,
+      personalBottleQuantity: item.personalBottleQuantity ?? 0,
       name: item.productNameSnapshot,
       quantity: item.quantity,
       bottleOrigin: item.bottleOrigin ?? null,
@@ -97,6 +109,7 @@ function toOperatorOrder(id: string, order: OrderRecord) {
     })),
     itemCount: order.itemCount ?? 0,
     totalFils: order.totalFils ?? 0,
+    moneyDueFils: orderMoneyDue(order), remainderMethod: orderMoneyMethod(order),
     paymentMethod: order.paymentMethod,
     paymentState: order.paymentState, collectedFils: order.collectedFils ?? 0, pendingCouponQuantity: order.pendingCouponQuantity ?? 0,
     // Status of the handover request, NOT any private booklet record.
@@ -114,11 +127,12 @@ export async function listEmployeeTodayOrders(storeAuthUid: string) {
     .where("orderDateKey", "==", day)
     .limit(500)
     .get();
-  const orders = snapshot.docs
+  const pending = await getFirebaseAdminFirestore().collection("deliveryOrders").where("status","in",["NEW","READY"]).limit(500).get();
+  const orders = [...new Map([...snapshot.docs,...pending.docs].map(doc=>[doc.id,doc])).values()]
     .filter((doc) => doc.data().storeAuthUid === storeAuthUid)
     .map((doc) => toOperatorOrder(doc.id, doc.data() as OrderRecord))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { day, orders, limitReached: snapshot.size === 500 };
+  return { day, orders, limitReached: snapshot.size === 500 || pending.size === 500 };
 }
 
 export async function changeEmployeeOrderStatus(
@@ -144,19 +158,13 @@ export async function changeEmployeeOrderStatus(
     if (order.storeAuthUid !== actor.storeAuthUid) {
       throw new DeliveryOrderBusinessError("NOT_FOUND", "الطلب غير موجود.");
     }
-    // Employee screen is restricted to operational orders from today only.
-    if (order.orderDateKey !== jordanDayKey()) {
-      throw new DeliveryOrderBusinessError(
-        "NOT_TODAY", "الطلب خارج تاريخ اليوم. راجع الإدارة.",
-      );
-    }
     if (order.status === action) {
       return { id: orderId, status: order.status, unchanged: true };
     }
     if (
       (action === "READY" && order.status !== "NEW") ||
       (action === "DELIVERED" && order.status !== "READY") ||
-      (action === "CANCELLED" && order.status !== "NEW")
+      (action === "CANCELLED" && !["NEW", "READY"].includes(order.status))
     ) {
       throw new DeliveryOrderBusinessError(
         "INVALID_TRANSITION", "حالة الطلب تغيّرت. حدّث القائمة وحاول مرة أخرى.",
@@ -164,7 +172,7 @@ export async function changeEmployeeOrderStatus(
     }
 
     if (action === "DELIVERED" && (!Number.isSafeInteger(order.totalFils) || order.totalFils < 0 || !["CASH","CLICK","COUPON"].includes(order.paymentMethod))) throw new DeliveryOrderBusinessError("INVALID_AMOUNT", "قيمة الطلب أو طريقة دفعه غير صالحة.");
-    if (paymentDeferred && (action !== "DELIVERED" || order.paymentMethod === "COUPON")) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
+    if (paymentDeferred && (action !== "DELIVERED" || orderMoneyDue(order) === 0)) throw new DeliveryOrderBusinessError("INVALID_PAYMENT", "تأجيل المبلغ متاح عند تسليم طلب كاش أو تحويل فقط.");
     const allocations = order.couponAllocations ?? [];
     const bookletReads = await Promise.all(
       (action === "CANCELLED" || (action === "DELIVERED" && order.paymentMethod === "COUPON"))
@@ -174,8 +182,8 @@ export async function changeEmployeeOrderStatus(
 
     let shiftRef: FirebaseFirestore.DocumentReference | null = null;
     let shift: FirebaseFirestore.DocumentData | undefined;
-    if (action === "DELIVERED" && order.paymentMethod !== "COUPON") {
-      if ((paymentCollected !== true && !paymentDeferred) || (paymentCollected && paymentDeferred)) {
+    if (action === "DELIVERED") {
+      if (orderMoneyDue(order) > 0 && ((paymentCollected !== true && !paymentDeferred) || (paymentCollected && paymentDeferred))) {
         throw new DeliveryOrderBusinessError(
           "PAYMENT_NOT_CONFIRMED", "أكد استلام المبلغ أو اختر «باقي على العميل» قبل التسليم.",
         );
@@ -215,8 +223,10 @@ export async function changeEmployeeOrderStatus(
 
     // Orders not yet prepared can adopt the new reservation timing safely.
     const inventoryPlan:InventoryPlan|null|undefined=action==="READY"&&order.inventoryPlan?{...order.inventoryPlan,merchandiseDeductionStage:"DELIVERED"}:order.inventoryPlan;
+    const privateBottles=action === "READY" ? {commit(){}} : await preparePrivateBottles(tx,db,order.customerId,order.items??[],action,orderId,actor.employeeId);
     const inventory = await prepareInventoryTransition(tx, db, inventoryPlan, order.status, action, bottleReturns, { operationId: `order:${orderId}:${action}`, actor: { id: actor.employeeId, name: actor.employeeName, type: "EMPLOYEE" }, customerId: order.customerId, customerName: order.customerNameSnapshot, orderId }, previousBottleReturns);
     inventory.commit();
+    privateBottles.commit();
     // No more reads beyond this point: all changes commit atomically.
     const now = Timestamp.now();
     const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
@@ -279,23 +289,18 @@ export async function changeEmployeeOrderStatus(
         update.paymentState = (order.pendingCouponQuantity ?? 0) > 0
           ? "AWAITING_BOOKLET_APPROVAL"
           : "COUPONS_SETTLED";
-      } else if (paymentDeferred && order.totalFils > 0) {
+      }
+      update.deliveredShiftId = shiftRef?.id ?? null;
+      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(order.totalFils),cashSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
+      if (paymentDeferred && orderMoneyDue(order) > 0) {
         update.paymentState = "PAYMENT_DUE"; update.collectedFils = 0; update.collectionMode = "RECEIPTS";
-        openOrderReceivable(tx, db, orderId, order, now, "MONEY", order.totalFils);
-      } else {
+        openOrderReceivable(tx, db, orderId, { ...order, totalFils: orderMoneyDue(order) }, now, "MONEY", orderMoneyDue(order));
+      } else if (orderMoneyDue(order) > 0) {
         update.paymentState = "COLLECTED";
         update.collectedAt = now;
         update.collectedByEmployeeId = actor.employeeId;
-        update.collectedFils = order.totalFils;
-        if (shiftRef) {
-          tx.update(shiftRef, {
-            saleCount: FieldValue.increment(1),
-            totalSalesFils: FieldValue.increment(order.totalFils),
-            cashSalesFils: FieldValue.increment(order.paymentMethod === "CASH" ? order.totalFils : 0),
-            clickSalesFils: FieldValue.increment(order.paymentMethod === "CLICK" ? order.totalFils : 0),
-            updatedAt: now,
-          });
-        }
+        update.collectedFils = orderMoneyDue(order);
+
       }
     }
 

@@ -116,3 +116,5 @@
 .details { min-width: 0; max-width: 100%; max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; box-sizing: border-box; }
 .details > * { min-width: 0; }
 @media (max-width: 600px) { .details { padding: 18px 14px; border-radius: 16px; } }
+
+.cardMeta .itemSummary{flex:1 1 100%;font-size:.8rem;line-height:1.9;overflow-wrap:anywhere;color:var(--text);white-space:normal}

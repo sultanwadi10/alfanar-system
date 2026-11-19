@@ -1,3 +1,4 @@
+import { getPrivateBottles } from "@/lib/customers/private-bottles";
 import "server-only";
 import { createHash } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -38,8 +39,8 @@ export async function customerAccount(customerId: string, storeAuthUid?: string)
   }
   const outstanding = [...rows.entries()].filter(([, d]) => d.outstanding > 0).map(([id, d]) => ({ id, orderId: d.orderId, orderNumber: d.orderNumber, kind: d.kind, outstanding: d.outstanding, original: d.original, settled: d.settled, expectedMethod: d.expectedMethod, at: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : null })).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   const partial = [debts, orders, booklets, receipts].some(s => s && s.size > LIMIT);
-  return { moneyDueFils: outstanding.filter(d => d.kind === "MONEY").reduce((n, d) => n + d.outstanding, 0), couponsDue: outstanding.filter(d => d.kind === "COUPON").reduce((n, d) => n + d.outstanding, 0), availableCoupons, partial, outstanding,
-    receipts: receipts?.docs.slice(0, LIMIT).map(doc => { const d = doc.data(); return { id: doc.id, orderNumber: String(d.orderNumber ?? ""), amount: unsigned(d.amount), method: String(d.method), at: d.receivedAt instanceof Timestamp ? d.receivedAt.toDate().toISOString() : null }; }).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")) ?? [] };
+  return { correctableOrders: storeAuthUid?[]:orders.docs.slice(0,LIMIT).filter(doc=>doc.data().status==="DELIVERED").map(doc=>{const d=doc.data();return {id:doc.id,number:String(d.orderNumber??doc.id),method:d.paymentMethod,items:(d.items??[]).map((i:FirebaseFirestore.DocumentData)=>({category:i.category,quantity:i.quantity,unitPriceFils:i.unitPriceFils})),consumedCoupons:(d.couponAllocations??[]).reduce((n:number,a:{quantity:number})=>n+a.quantity,0)+(d.couponQuantity??0)-(d.couponAllocations??[]).reduce((n:number,a:{quantity:number})=>n+a.quantity,0)-(d.pendingCouponQuantity??0)};}), privateBottles: await getPrivateBottles(customerId), moneyDueFils: outstanding.filter(d => d.kind === "MONEY").reduce((n, d) => n + d.outstanding, 0), couponsDue: outstanding.filter(d => d.kind === "COUPON").reduce((n, d) => n + d.outstanding, 0), availableCoupons, partial, outstanding,
+    receipts: receipts?.docs.slice(0, LIMIT).map(doc => { const d = doc.data(); return { id: doc.id, orderNumber: String(d.orderNumber ?? ""), amount: unsigned(d.amount)*(d.direction===-1?-1:1), method: String(d.method), at: d.receivedAt instanceof Timestamp ? d.receivedAt.toDate().toISOString() : null }; }).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")) ?? [] };
 }
 export async function settleReceivable(input: { requestId: string; customerId: string; receivableId: string; amount: number; method: "CASH" | "CLICK" | "COUPON"; adminUid: string }) {
   checkCustomer(input.customerId);
@@ -55,7 +56,7 @@ export async function settleReceivable(input: { requestId: string; customerId: s
     const debt = debtDoc.data() ?? (order.paymentMethod === "COUPON" ? receivableFromOrder(orderRef.id, order, order.deliveredAt ?? now, "COUPON", unsigned(order.pendingCouponQuantity ?? 0)) : null);
     if (!debt || !["MONEY","COUPON"].includes(debt.kind) || debt.customerId !== input.customerId || debt.orderId !== orderRef.id || debt.storeAuthUid !== order.storeAuthUid || unsigned(debt.outstanding) < input.amount || unsigned(debt.original) !== unsigned(debt.outstanding) + unsigned(debt.settled)) throw new ReceivableError("INVALID_BALANCE", "قيمة التسديد تتجاوز المستحق أو أن الرصيد تغيّر.");
     if ((debt.kind === "COUPON") !== (input.method === "COUPON")) throw new ReceivableError("INVALID_METHOD", "اختر طريقة تسديد مطابقة لنوع المستحق.");
-    if (debt.kind === "COUPON" ? unsigned(order.pendingCouponQuantity ?? 0) !== debt.outstanding : (unsigned(order.totalFils) !== debt.original || unsigned(order.collectedFils ?? 0) + debt.outstanding !== debt.original || order.collectionMode !== "RECEIPTS")) throw new ReceivableError("INVALID_BALANCE", "رصيد الطلب والمستحق غير متطابقين.");
+    if (debt.kind === "COUPON" ? unsigned(order.pendingCouponQuantity ?? 0) !== debt.outstanding : (unsigned(order.moneyDueFils ?? order.totalFils) !== debt.original || unsigned(order.collectedFils ?? 0) + debt.outstanding !== debt.original || order.collectionMode !== "RECEIPTS")) throw new ReceivableError("INVALID_BALANCE", "رصيد الطلب والمستحق غير متطابقين.");
     const allocations: Array<{ id: string; quantity: number; remaining: number }> = [];
     let shiftRef: FirebaseFirestore.DocumentReference | null = null;
     let shift: FirebaseFirestore.DocumentData | undefined;

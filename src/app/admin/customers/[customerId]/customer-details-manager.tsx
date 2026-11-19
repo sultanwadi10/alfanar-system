@@ -1,4 +1,6 @@
 "use client";
+import { limitJordanPhoneInput,normalizeJordanPhone } from "@/lib/customers/customer-phone";
+import { CustomerPrivateBottles } from "@/components/admin/customer-private-bottles";
 import { userMessage } from "@/lib/client/user-message";
 import { useTransientMessage } from "@/lib/client/use-transient-message";
 import { useConfirmation } from "@/lib/client/use-confirmation";
@@ -124,6 +126,7 @@ export function CustomerDetailsManager({
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+    if(!normalizeJordanPhone(phone)){setErrorMessage(userMessage("أدخل رقم هاتف أردني صحيحًا ومكتملًا."));return;}
     const special=specialEnabled?parseDinars(specialPrice):null;
     if(specialEnabled&&(special===null||special>10_000_000)){setErrorMessage(userMessage("أدخل سعرًا صحيحًا بالدينار، حتى ثلاث منازل عشرية."));return;}
 
@@ -453,12 +456,11 @@ export function CustomerDetailsManager({
                 رقم الهاتف
 
                 <input
-                  type="tel"
+                  type="tel" onPaste={event=>{event.preventDefault();setPhone(limitJordanPhoneInput(event.clipboardData.getData("text")));}}
+                  maxLength={14}
                   value={phone}
                   onChange={(event) =>
-                    setPhone(
-                      event.target.value,
-                    )
+                    setPhone(limitJordanPhoneInput(event.target.value))
                   }
                   inputMode="tel"
                   disabled={
@@ -491,6 +493,7 @@ export function CustomerDetailsManager({
               </label>
 
               <div className={styles.specialPriceSettings}><label className={styles.specialPriceToggle}><input type="checkbox" checked={specialEnabled} onChange={event=>setSpecialEnabled(event.target.checked)} disabled={loading}/>سعر خاص لتعبئة 20 لتر بالتوصيل</label>{specialEnabled&&<label>سعر القارورة — بالدينار<input inputMode="decimal" lang="en-GB" dir="ltr" value={specialPrice} onChange={event=>setSpecialPrice(event.target.value)} placeholder="0.750" required disabled={loading}/></label>}</div>
+              <CustomerPrivateBottles customerId={customer.id} disabled={loading||customer.isArchived}/>
               <label>
                 ملاحظات داخلية
 
@@ -609,6 +612,7 @@ export function CustomerDetailsManager({
               </div>
 
               <div className={styles.detailRow}><span>سعر تعبئة 20 لتر بالتوصيل</span><strong>{customer.specialDelivery20LPriceFils!=null?<><bdi>{dinars(customer.specialDelivery20LPriceFils)}</bdi> د.أ</>:"السعر الافتراضي"}</strong></div>
+              <CustomerPrivateBottles customerId={customer.id} disabled={customer.isArchived}/>
               <div
                 className={
                   styles.notesRow

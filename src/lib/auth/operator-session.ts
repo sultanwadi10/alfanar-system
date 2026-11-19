@@ -14,8 +14,6 @@ import {
   getEmployeeAuthRecord,
   type EmployeeAuthRecord,
 } from "@/lib/employees/employee-repository";
-import { getEmployeeCurrentScheduleAccess } from "@/lib/employees/employee-schedule-repository";
-import { getActiveShift } from "@/lib/shifts/shift-repository";
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
 
 const OPERATOR_SESSIONS_COLLECTION =
@@ -218,18 +216,9 @@ export async function resolveOperatorSession(
    * انتهاء الدوام يمنع العمليات، مع السماح لنقطة التسليم فقط
    * بالتحقق من صاحب الشفت المفتوح. لا تمديد لعمر الجلسة.
    */
-  const scheduleAccess =
-    await getEmployeeCurrentScheduleAccess(
-      employee.id,
-    );
-
-  if (
-    !scheduleAccess.allowed
-  ) {
-    if (!options.handoverOnly) return null;
-    const activeShift = await getActiveShift(storeAuthUid);
-    if (!activeShift || activeShift.openedByEmployeeId !== employee.id) return null;
-  }
+  // Roster times are advisory. A shift stays usable until an explicit handover.
+  // Expiry, employee activation, PIN version and handover revocation still apply.
+  void options;
 
   return {
     employeeId:

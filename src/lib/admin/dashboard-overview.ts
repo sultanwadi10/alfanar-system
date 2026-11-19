@@ -1,3 +1,4 @@
+import { orderMoneyDue, orderMoneyMethod } from "@/lib/orders/payment-plan";
 import "server-only";
 import { cache } from "react";
 import { Timestamp, type DocumentData, type QuerySnapshot } from "firebase-admin/firestore";
@@ -29,18 +30,30 @@ export const getDashboardStatus = cache(async (inventory?: Promise<QuerySnapshot
   const shiftDocs = await Promise.all(shiftIds.map(id => db.collection("shifts").doc(id).get()));
   const shifts = shiftDocs.flatMap(d => { const v = d.data(), at = date(v?.openedAt); return v?.status === "OPEN" && at ? [{ id: d.id, employee: String(v.openedByEmployeeNameSnapshot ?? "موظف"), openedAt: at.toISOString() }] : []; });
   let pendingCollectionCount = 0, pendingCollectionFils = 0;
-  for (const d of rows(pending)) { const v = d.data(); if ((v.paymentMethod === "CASH" || v.paymentMethod === "CLICK") && v.paymentState !== "COLLECTED") { ++pendingCollectionCount; pendingCollectionFils += amount(v.totalFils); } }
+  for (const d of rows(pending)) { const v = d.data(); const due=orderMoneyDue(v as {paymentMethod:string;totalFils:number}); if (due>0 && v.paymentState !== "COLLECTED") { ++pendingCollectionCount; pendingCollectionFils += amount(due); } }
   const lowStockCount = rows(items).filter(d => { const i = d.data(); return i.active && !i.trashed && Number.isSafeInteger(i.lowStock) && [i.room, i.cooler, i.reservedRoom, i.reservedCooler].every(Number.isSafeInteger) && i.room + i.cooler - i.reservedRoom - i.reservedCooler <= i.lowStock; }).length;
   return { at: new Date().toISOString(), shifts, pendingCount: Math.min(pending.size, MAX_ROWS), pendingCollectionCount, pendingCollectionFils, lowStockCount, owedBottles: rows(debts).reduce((sum, d) => sum + amount(d.data().quantity), 0), partial: indices.size > 20 || [pending, items, debts].some(s => s.size > MAX_ROWS) };
 });
-export async function getDashboardOverview(period: DashboardPeriod = "today", now = new Date(), rangeOverride?: ReturnType<typeof dashboardRange>): Promise<DashboardOverview> {
-  const db = getFirebaseAdminFirestore(), range = rangeOverride ?? dashboardRange(period, now);
+export async function getDashboardOverview(period: DashboardPeriod = "today", now = new Date(), rangeOverride?: ReturnType<typeof dashboardRange>, requestedShiftId?: string): Promise<DashboardOverview> {
+  const db = getFirebaseAdminFirestore();
+  const history=period==="shift"?await db.collection("shifts").orderBy("openedAt","desc").limit(60).get():null;
+  const shiftChoices=history?.docs.map(doc=>{const d=doc.data();return {id:doc.id,employee:String(d.openedByEmployeeNameSnapshot??"موظف"),openedAt:date(d.openedAt)!.toISOString(),closedAt:date(d.closedAt)?.toISOString()??null,shiftType:["MORNING","EVENING"].includes(d.shiftTimeSnapshot?.shiftType)?d.shiftTimeSnapshot.shiftType as "MORNING"|"EVENING":null,workDay:d.shiftTimeSnapshot?.workDay??dayKey(date(d.openedAt)!)};})??[];
+  const selected=period==="shift" ? history?.docs.find(d=>requestedShiftId?d.id===requestedShiftId:d.data().status==="OPEN")??(!requestedShiftId?history?.docs[0]:undefined) : undefined;
+  if(requestedShiftId && !selected)throw Error("Shift not available");
+  const shift=selected?.data();
+  const belongs=(record:DocumentData,key:string)=>{
+    if(period!=="shift"||!selected)return true;
+    if(record[key]!==undefined)return record[key]===selected.id;
+    return !record.storeAuthUid||record.storeAuthUid===shift?.storeAuthUid;
+  };
+  const counted=period==="shift"&&shift?{banknotesFils:shift.banknotesFils??null,coinsFils:shift.coinsFils??null,actualCashFils:shift.actualCashFils??null,differenceFils:shift.differenceFils??null,wagePaidFils:shift.wagePaidFils??0,closed:shift.status==="CLOSED"}:undefined;
+  const range=rangeOverride ?? (period==="shift" ? {start:date(shift?.openedAt)??now,end:date(shift?.closedAt)??new Date(now.getTime()+1),first:dayKey(date(shift?.openedAt)??now),label:selected?"شفت "+String(shift?.openedByEmployeeNameSnapshot??"الموظف"):"لا يوجد شفت"} : dashboardRange(period,now));
   const cutoff = period === "yesterday" ? range.end : new Date(Math.min(range.end.getTime(), now.getTime() + 1));
   const ranged = (name: string, field: string) => db.collection(name).where(field, ">=", Timestamp.fromDate(range.start)).where(field, "<", Timestamp.fromDate(cutoff)).orderBy(field, "desc").limit(MAX_ROWS + 1).get();
   const stockRequest = db.collection("inventoryItems").limit(MAX_ROWS + 1).get();
   const [sales, delivered, collected, receipts, booklets, financialBooklets, policies, stock, productDefinitions, status] = await Promise.all([ranged("directSales", "createdAt"), ranged("deliveryOrders", "deliveredAt"), ranged("deliveryOrders", "collectedAt"), ranged("receivableCollections", "receivedAt"), ranged("couponBookletSales", "createdAt"), ranged("couponBookletSales", "financialAt"), db.collection("inventoryPolicies").limit(MAX_ROWS + 1).get(), stockRequest, db.collection("products").limit(MAX_ROWS + 1).get(), getDashboardStatus(stockRequest)]);
   const hourly = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", hourCycle: "h23" });
-  const bucketKey = (at: Date) => period === "week" ? dayKey(at) : hourly.format(at);
+  const bucketKey = (at: Date) => period === "week" || period === "shift" ? dayKey(at) + (period === "shift" ? " "+hourly.format(at)+":00" : "") : hourly.format(at);
   const buckets = new Map<string, DashboardOverview["buckets"][number]>();
   const storeActivity=new Map<string,{bottles:number;other:number;count:number}>(),definitions=new Map(productDefinitions.docs.map(d=>[d.id,d.data()]));
   let storeActivityUnclassifiedFils=0;
@@ -62,7 +75,7 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
     }
   }
   for (const d of rows(sales)) {
-    const v = d.data(), at = date(v.createdAt); if (!at || v.isVoided || v.status === "CANCELLED") continue;
+    const v = d.data(), at = date(v.createdAt); if (!at || v.isVoided || v.status === "CANCELLED" || !belongs(v,"shiftId")) continue;
     const total = amount(v.totalFils); storeSales += total; ++storeCount;
     if (v.paymentMethod === "CASH") storeCash += total; else if (v.paymentMethod === "CLICK") storeClick += total; else throw Error("Unknown counter payment");
     register("store", d.id, v, at, total);
@@ -80,27 +93,27 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
     storeActivity.set(key,current);
   }
   for (const d of rows(delivered)) {
-    const v = d.data(), at = date(v.deliveredAt); if (v.status !== "DELIVERED" || !at) continue;
+    const v = d.data(), at = date(v.deliveredAt); if (v.status !== "DELIVERED" || !at || !belongs(v,"deliveredShiftId")) continue;
     const total = amount(v.totalFils); deliverySales += total; ++deliveryCount;
-    if (v.paymentMethod === "COUPON") { couponSales += total; if (v.paymentState === "AWAITING_BOOKLET_APPROVAL") ++couponAwaiting; }
+    if (v.paymentMethod === "COUPON") { couponSales += amount(v.couponValueFils ?? total); if (v.paymentState === "AWAITING_BOOKLET_APPROVAL") ++couponAwaiting; }
     register("delivery", d.id, v, at, total);
   }
   const collectionRows = new Map(rows(collected).map(d => [d.id, d.data()]));
   // Older collected orders without collectedAt use their delivery timestamp.
   for (const d of rows(delivered)) if (!date(d.data().collectedAt) && d.data().paymentState === "COLLECTED") collectionRows.set(d.id, d.data());
   for (const v of collectionRows.values()) {
-    if (v.collectionMode === "RECEIPTS" || v.status !== "DELIVERED" || v.paymentState !== "COLLECTED") continue;
+    if (v.collectionMode === "RECEIPTS" || v.status !== "DELIVERED" || v.paymentState !== "COLLECTED" || !belongs(v,"deliveredShiftId")) continue;
     const total = amount(v.collectedFils ?? v.totalFils);
-    if (v.paymentMethod === "CASH") deliveryCash += total; else if (v.paymentMethod === "CLICK") deliveryClick += total;
+    if (orderMoneyMethod(v as {paymentMethod:string}) === "CASH") deliveryCash += total; else if (orderMoneyMethod(v as {paymentMethod:string}) === "CLICK") deliveryClick += total;
   }
     for (const d of rows(receipts)) {
-      const receipt=d.data(); if(receipt.kind!=="MONEY") continue;
-      if(receipt.method==="CASH") deliveryCash+=amount(receipt.amount);
-      else if(receipt.method==="CLICK") deliveryClick+=amount(receipt.amount);
+      const receipt=d.data(); if(receipt.kind!=="MONEY" || !belongs(receipt,"shiftId")) continue;
+      if(receipt.method==="CASH") deliveryCash+=(receipt.direction===-1?-1:1)*amount(receipt.amount);
+      else if(receipt.method==="CLICK") deliveryClick+=(receipt.direction===-1?-1:1)*amount(receipt.amount);
       else throw Error("Unknown receivable collection method");
     }
   for (const d of new Map([...rows(booklets),...rows(financialBooklets)].map(d=>[d.id,d])).values()) {
-    const v = d.data(), at = date(v.channel === "STORE" ? v.financialAt ?? v.createdAt : v.createdAt); if (!at || at < range.start || at >= cutoff || v.isVoided || v.status === "CANCELLED") continue;
+    const v = d.data(), at = date(v.channel === "STORE" ? v.financialAt ?? v.createdAt : v.createdAt); if (!at || at < range.start || at >= cutoff || v.isVoided || v.status === "CANCELLED" || !belongs(v,"shiftId")) continue;
     const total = amount(v.priceFils), channel = typeof v.orderId === "string" && v.orderId ? "delivery" : v.channel === "STORE" ? "store" : null;
     if (!channel) throw Error("Unknown booklet collection source");
     if (v.paymentMethod === "CASH") { bookletCash += total; if (channel === "store") storeCash += total; else deliveryCash += total; }
@@ -110,12 +123,13 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
   }
   const currentHour = Number(hourly.format(now)), firstSale = buckets.size ? Math.min(...[...buckets.keys()].map(Number)) : Math.max(0, currentHour - 5);
   const keys = period === "week" ? Array.from({ length: Math.round((Date.parse(dayKey(range.end)) - Date.parse(range.first)) / 86400000) }, (_, i) => shiftDay(range.first, i)) : Array.from({ length: (period === "yesterday" ? 23 : currentHour) - (period === "yesterday" ? 0 : firstSale) + 1 }, (_, i) => String(i + (period === "yesterday" ? 0 : firstSale)).padStart(2, "0"));
-  const outputBuckets = keys.map(key => ({ ...(buckets.get(key) ?? { key, store: 0, delivery: 0, count: 0 }), label: period === "week" ? new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric" }).format(midnight(key)) : `${key}:00`, fullLabel: period === "week" ? new Intl.DateTimeFormat("en-GB", { timeZone: zone, dateStyle: "full" }).format(midnight(key)) : `${key}:00 – ${String(Number(key) + 1).padStart(2, "0")}:00` }));
+  const visibleKeys=period==="shift"?[...buckets.keys()].sort():keys;
+  const outputBuckets = visibleKeys.map(key => ({ ...(buckets.get(key) ?? { key, store: 0, delivery: 0, count: 0 }), label: period === "shift" ? key : period === "week" ? new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric" }).format(midnight(key)) : `${key}:00`, fullLabel: period === "shift" ? key : period === "week" ? new Intl.DateTimeFormat("en-GB", { timeZone: zone, dateStyle: "full" }).format(midnight(key)) : `${key}:00 – ${String(Number(key) + 1).padStart(2, "0")}:00` }));
   const activityFirst=storeActivity.size?Math.min(...[...storeActivity.keys()].map(Number)):Math.max(0,currentHour-5);
   const activityKeys=period==="week"?keys:Array.from({length:(period==="yesterday"?23:currentHour)-(period==="yesterday"?0:activityFirst)+1},(_,i)=>String(i+(period==="yesterday"?0:activityFirst)).padStart(2,"0"));
-  const activityBuckets=activityKeys.map(key=>({key,...(storeActivity.get(key)??{bottles:0,other:0,count:0}),label:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,weekday:"short",day:"numeric"}).format(midnight(key)):key+":00",fullLabel:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,dateStyle:"full"}).format(midnight(key)):key+":00 – "+String(Number(key)+1).padStart(2,"0")+":00"}));
+  const activityBuckets=(period==="shift"?[...storeActivity.keys()].sort():activityKeys).map(key=>({key,...(storeActivity.get(key)??{bottles:0,other:0,count:0}),label:period==="shift"?key:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,weekday:"short",day:"numeric"}).format(midnight(key)):key+":00",fullLabel:period==="shift"?key:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,dateStyle:"full"}).format(midnight(key)):key+":00 – "+String(Number(key)+1).padStart(2,"0")+":00"}));
   events.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
-  return { storeActivity:activityBuckets, storeActivityUnclassifiedFils, period, label: range.label, start: range.start.toISOString(), end: cutoff.toISOString(), at: now.toISOString(), status, storeSales, deliverySales, storeCount, deliveryCount, storeCash, deliveryCash, storeClick, deliveryClick, couponSales, couponAwaiting, bookletCash, bookletClick, bookletCount: events.filter(e => e.kind === "booklet").length, buckets: outputBuckets, products: [...products.values()], events: events.slice(0, 2000), eventCount: events.length, partial: status.partial || [sales, delivered, collected, receipts, booklets, financialBooklets, policies, stock, productDefinitions].some(s => s.size > MAX_ROWS) };
+  return { cashCount:counted, selectedShiftId:selected?.id, shifts:shiftChoices, expectedCashFils:period==="shift"?(shift?.status==="CLOSED"?shift?.expectedHandoverFils??shift?.cashSalesFils??0:shift?.cashSalesFils??0):undefined, storeActivity:activityBuckets, storeActivityUnclassifiedFils, period, label: range.label, start: range.start.toISOString(), end: cutoff.toISOString(), at: now.toISOString(), status, storeSales, deliverySales, storeCount, deliveryCount, storeCash, deliveryCash, storeClick, deliveryClick, couponSales, couponAwaiting, bookletCash, bookletClick, bookletCount: events.filter(e => e.kind === "booklet").length, buckets: outputBuckets, products: [...products.values()], events: events.slice(0, 2000), eventCount: events.length, partial: status.partial || [sales, delivered, collected, receipts, booklets, financialBooklets, policies, stock, productDefinitions].some(s => s.size > MAX_ROWS) };
 }
 
 export { dayKey as ammanDayKey, midnight as ammanMidnight, shiftDay as calendarDay };

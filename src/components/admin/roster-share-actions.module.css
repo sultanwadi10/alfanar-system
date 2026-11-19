@@ -1,0 +1,5 @@
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.actions button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:9px 17px;border:1px solid var(--dash-blue,#0861df);border-radius:11px;font:inherit;font-size:13px;font-weight:600;background:var(--dash-card,#fff);color:var(--dash-blue,#0861df);cursor:pointer}
+.actions button:disabled{opacity:.5;cursor:wait}.actions button:hover:not(:disabled){background:var(--dash-card-soft,#eef5ff)}
+.actions button:focus-visible{outline:3px solid #73aaff;outline-offset:3px}.message{margin:0;font-size:12px;color:var(--dash-muted,#58738c)}
+@media(max-width:540px){.actions{gap:8px}.actions button{padding:9px 12px}}

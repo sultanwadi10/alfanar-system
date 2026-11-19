@@ -1,9 +1,10 @@
 import type { ReactNode, SVGProps } from "react";
 
-export type AlfanarIconName = "book" | "ticket" | "truck" | "clock" | "plus" | "info" | "shield" | "calendar" | "activity" | "chevron-down" | "chevron-up" | "x" | "search" | "refresh" | "user" | "coins" | "package" | "check" | "filter" | "grid" | "store" | "cart" | "users" | "tag" | "snowflake" | "bars" | "settings" | "file" | "sun" | "moon" | "bell" | "logout" | "menu" | "arrow-left" | "card";
+export type AlfanarIconName = "image" | "book" | "ticket" | "truck" | "clock" | "plus" | "info" | "shield" | "calendar" | "activity" | "chevron-down" | "chevron-up" | "x" | "search" | "refresh" | "user" | "coins" | "package" | "check" | "filter" | "grid" | "store" | "cart" | "users" | "tag" | "snowflake" | "bars" | "settings" | "file" | "sun" | "moon" | "bell" | "logout" | "menu" | "arrow-left" | "card";
 
 export function AlfanarIcon({ name, size = 18, ...props }: SVGProps<SVGSVGElement> & { name: AlfanarIconName; size?: number }) {
   const paths: Record<AlfanarIconName, ReactNode> = {
+    image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>,
     grid: <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
     store: <><path d="M3 10h18l-2-6H5l-2 6ZM5 13v8h14v-8M9 21v-7h6v7M3 10c0 4 4 4 4 0 0 4 5 4 5 0 0 4 5 4 5 0 0 4 4 4 4 0"/></>,
     cart: <><path d="M2 4h3l3 12h11l3-9H6"/><circle cx="10" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></>,
