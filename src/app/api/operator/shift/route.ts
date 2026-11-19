@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { resolveOperatorSession } from "@/lib/auth/operator-session";
 import {
   getActiveShift,
+  getShiftOpeningSuggestion,
   ShiftOwnedByAnotherEmployeeError,
   startShift,
 } from "@/lib/shifts/shift-repository";
@@ -49,10 +50,12 @@ export async function GET() {
       );
 
     if (!shift) {
+      const suggestedShiftType=await getShiftOpeningSuggestion(operator.employeeId,storeContext.authUid);
       return NextResponse.json({
         success: true,
 
         data: {
+          suggestedShiftType,
           stage:
             "NO_SHIFT",
         },

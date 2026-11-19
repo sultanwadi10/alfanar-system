@@ -1,4 +1,5 @@
-import { currentRosterTimes } from "@/lib/employees/roster-repository";
+import { currentRosterContext } from "@/lib/employees/roster-repository";
+import { suggestShiftType } from "./shift-selection";
 import { cashCount } from "./cash-count";
 import { prepareDailyWage } from "./daily-wage-repository";
 import { OPERATOR_SESSION_CUTOFFS, operatorSessionCutoffId } from "@/lib/auth/operator-session-cutoff";
@@ -27,6 +28,7 @@ type ShiftStatus =
   (typeof SHIFT_STATUSES)[keyof typeof SHIFT_STATUSES];
 
 type ShiftRecord = {
+  shiftTypeSource?: "MANUAL" | "AUTO_SCHEDULE" | "AUTO_HANDOVER" | "AUTO_CLOCK";
   banknotesFils?: number | null;
   coinsFils?: number | null;
   wageFilsSnapshot?: number | null;
@@ -227,6 +229,14 @@ export async function getActiveShift(
   );
 }
 
+async function openingContext(tx:FirebaseFirestore.Transaction,db:FirebaseFirestore.Firestore,at:Date,employeeId:string,storeAuthUid:string){
+  const [roster,history]=await Promise.all([currentRosterContext(tx,db,at,employeeId),tx.get(db.collection(SHIFTS_COLLECTION).orderBy("openedAt","desc").limit(60))]);
+  const previous=history.docs.map(d=>d.data()).find(d=>d.storeAuthUid===storeAuthUid&&d.status==="CLOSED"&&d.closedAt instanceof Timestamp&&["MORNING","EVENING"].includes(d.shiftTimeSnapshot?.shiftType));
+  const suggestion=suggestShiftType(at,roster.settings,roster.schedule,previous?{type:previous.shiftTimeSnapshot.shiftType,workDay:previous.shiftTimeSnapshot.workDay,closedAt:previous.closedAt.toDate()}:undefined);
+  return {...roster,suggestion};
+}
+export async function getShiftOpeningSuggestion(employeeId:string,storeAuthUid:string){const db=getFirebaseAdminFirestore();return db.runTransaction(async tx=>(await openingContext(tx,db,new Date(),employeeId,storeAuthUid)).suggestion.type);}
+
 export async function startShift(input: {
   shiftType?: "MORNING" | "EVENING";
   storeAuthUid: string;
@@ -322,7 +332,7 @@ export async function startShift(input: {
 
       // Snapshot admin-only terms in the same transaction as opening the shift.
       const wageDocument = await transaction.get(firestore.collection("systemSettings").doc("employeeWage"));
-      const times = await currentRosterTimes(transaction, firestore, now.toDate());
+      const {settings:times,suggestion} = await openingContext(transaction, firestore, now.toDate(),input.employeeId,input.storeAuthUid);
       const wage = wageDocument.exists ? wageDocument.data()?.dailyWageFils : null;
       if (wage !== null && !validWage(wage)) throw Error("Invalid wage configuration");
 
@@ -330,7 +340,8 @@ export async function startShift(input: {
         {
           wageFilsSnapshot: wage,
           payrollVersion: 2,
-          shiftTimeSnapshot: shiftTimeSnapshot(now.toDate(), times, input.shiftType),
+          shiftTimeSnapshot: shiftTimeSnapshot(now.toDate(), times, input.shiftType??suggestion.type),
+          shiftTypeSource:input.shiftType?"MANUAL":suggestion.source,
 
           storeAuthUid:
             input.storeAuthUid,

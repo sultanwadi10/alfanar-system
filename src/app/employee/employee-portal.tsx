@@ -56,7 +56,7 @@ type OperatorResult =
 
 type ShiftResult =
   | {
-      type: "NO_SHIFT";
+      type: "NO_SHIFT"; suggestedShiftType?: "MORNING"|"EVENING";
     }
   | {
       type: "OPEN_SHIFT";
@@ -166,7 +166,7 @@ async function fetchShiftState(): Promise<ShiftResult> {
       "NO_SHIFT"
     ) {
       return {
-        type: "NO_SHIFT",
+        type: "NO_SHIFT", suggestedShiftType: data.data.suggestedShiftType,
       };
     }
 
@@ -188,7 +188,8 @@ async function fetchShiftState(): Promise<ShiftResult> {
 }
 
 export default function EmployeePortal() {
-  const [openingShiftType,setOpeningShiftType]=useState<"MORNING"|"EVENING">("MORNING");
+  const [openingShiftType,setOpeningShiftType]=useState<"AUTO"|"MORNING"|"EVENING">("AUTO");
+  const [suggestedShiftType,setSuggestedShiftType]=useState<"MORNING"|"EVENING"|null>(null);
   const router =
     useRouter();
 
@@ -364,6 +365,7 @@ export default function EmployeePortal() {
         shiftResult.type ===
         "NO_SHIFT"
       ) {
+      setSuggestedShiftType(shiftResult.suggestedShiftType??null);setOpeningShiftType("AUTO");
         setStage(
           "NO_SHIFT",
         );
@@ -469,6 +471,7 @@ export default function EmployeePortal() {
       shiftResult.type ===
       "NO_SHIFT"
     ) {
+      setSuggestedShiftType(shiftResult.suggestedShiftType??null);setOpeningShiftType("AUTO");
       setShift(null);
 
       setStage(
@@ -594,7 +597,7 @@ export default function EmployeePortal() {
             method:
               "POST",
             headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({shiftType:openingShiftType}),
+            body:JSON.stringify(openingShiftType==="AUTO"?{}:{shiftType:openingShiftType}),
           },
         );
 
@@ -1286,7 +1289,7 @@ export default function EmployeePortal() {
             </div>
           )}
 
-          <label>نوع الشفت <select value={openingShiftType} onChange={e=>setOpeningShiftType(e.target.value as "MORNING"|"EVENING")} disabled={loading}><option value="MORNING">صباحي</option><option value="EVENING">مسائي</option></select></label><p>يمكن البدء والإغلاق بأي وقت؛ مواعيد الجدول للتنظيم فقط.</p>
+          <label>نوع الشفت <select value={openingShiftType} onChange={e=>setOpeningShiftType(e.target.value as "AUTO"|"MORNING"|"EVENING")} disabled={loading}><option value="AUTO">تلقائي{suggestedShiftType?` — ${suggestedShiftType==="MORNING"?"صباحي":"مسائي"}`:""}</option><option value="MORNING">صباحي</option><option value="EVENING">مسائي</option></select></label>
           <button
             type="button"
             className={

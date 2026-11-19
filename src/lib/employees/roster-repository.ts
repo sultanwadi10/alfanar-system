@@ -62,8 +62,12 @@ export async function saveRosterWeek(input:Omit<RosterWeek,"employees"|"revision
     tx.set(ref,{...result,updatedAt:at,updatedByAuthUid:adminUid});tx.create(opRef,{fingerprint,result,createdAt:at,adminUid});return result;
   });
 }
-export async function currentRosterTimes(tx:Transaction,db:Firestore,at:Date){
+export async function currentRosterContext(tx:Transaction,db:Firestore,at:Date,employeeId?:string){
   const week=rosterWeekStart(ammanCalendarDate(at));
-  const [roster,baseline,legacy]=await Promise.all([tx.get(db.collection(WEEKS).doc(week)),tx.get(db.collection("systemSettings").doc(BASELINE)),tx.get(db.collection("systemSettings").doc("employeeShiftTimes"))]);
-  return roster.exists?storedWeek(week,roster.data()!).settings:baseline.exists?storedWeek(String(baseline.data()!.weekStart),baseline.data()!).settings:shiftTimeSettingsSchema.parse(legacy.data()??DEFAULT_SHIFT_TIMES);
+  const [roster,baseline,legacy,oldSchedule]=await Promise.all([tx.get(db.collection(WEEKS).doc(week)),tx.get(db.collection("systemSettings").doc(BASELINE)),tx.get(db.collection("systemSettings").doc("employeeShiftTimes")),employeeId?tx.get(db.collection("employeeSchedules").doc(employeeId)):Promise.resolve(null)]);
+  const saved=roster.exists?storedWeek(week,roster.data()!):baseline.exists?storedWeek(String(baseline.data()!.weekStart),baseline.data()!):null;
+  const settings=saved?.settings??shiftTimeSettingsSchema.parse(legacy.data()??DEFAULT_SHIFT_TIMES);
+  const schedule=employeeId&&saved?.weekStart===week?saved.schedules[employeeId]??emptyRosterSchedule():baseline.exists||roster.exists?emptyRosterSchedule():employeeScheduleSchema.parse({...emptyRosterSchedule(),...oldSchedule?.data()});
+  return {settings,schedule};
 }
+export async function currentRosterTimes(tx:Transaction,db:Firestore,at:Date){return (await currentRosterContext(tx,db,at)).settings;}

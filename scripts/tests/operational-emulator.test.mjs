@@ -1,4 +1,5 @@
 import { checkSettlements } from "./settlement-operational.mjs";
+import { checkShiftOpening } from "./shift-opening-operational.mjs";
 import { checkRosters } from "./roster-operational.mjs";
 import assert from "node:assert/strict";
 import { readFileSync,existsSync } from "node:fs";
@@ -70,6 +71,7 @@ await check("ordinary customer has no private step and cannot forge stock exempt
 await check("ownership-only profile saves and is reusable after deliveries",async()=>{const {savePrivateBottles}=load("@/lib/customers/private-bottles");const rows=await savePrivateBottles(customerId,[{origin:"JORDANIAN",sizeMl:20000,owned:3}],"preview-admin");assert.equal(rows[0].owned,3);assert.equal(rows[0].atStore,undefined);});
 await checkSettlements({db,load,check,projectId:testApp.options.projectId,actor,customerId,bookId,input});
 await checkRosters({db,load,check,employeeId,projectId:testApp.options.projectId});
+await checkShiftOpening({db,load,check,projectId:testApp.options.projectId,actor,Timestamp});
 console.log(`Operational emulator checks passed: ${checks}. Test project: demo-alfanar-checks; live data untouched.`);
 // Remove only this run's invented fixtures from the emulator. Never scan or
 // delete outside the guarded demo project, and never touch user preview data.
