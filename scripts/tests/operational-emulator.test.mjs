@@ -1,3 +1,4 @@
+import { checkReceivedMoney } from "./received-money-operational.mjs";
 import { checkSettlements } from "./settlement-operational.mjs";
 import { checkShiftOpening } from "./shift-opening-operational.mjs";
 import { checkRosters } from "./roster-operational.mjs";
@@ -69,6 +70,7 @@ await check("handover any time closes once; new employee starts immediately; adm
 await check("pure payment plan rejects invalid input and preserves special prices",async()=>{const p=deliveryPaymentPlan([{category:"REFILL",quantity:3,unitPriceFils:750},{category:"CUPS",quantity:1,unitPriceFils:1000}],2,true);assert.equal(p.moneyDueFils,1750);assert.equal(p.couponQuantity,2);assert.throws(()=>deliveryPaymentPlan([],NaN,true));});
 await check("ordinary customer has no private step and cannot forge stock exemption",async()=>{const regularId=prefix+"-regular";await set("customers",regularId,{name:"عميل عادي",phoneNormalized:"+962790000008",isArchived:false});const ordinary=input("CASH",1,999);ordinary.customerId=regularId;ordinary.items[0].storeBottleShortageConfirmed=false;const result=await createDeliveryOrder(ordinary,{...actor,employeeId:"next"});assert.equal((await data("deliveryOrders",result.orderId)).items[0].personalBottleQuantity,0);await changeEmployeeOrderStatus(result.orderId,"CANCELLED",{...actor,employeeId:"next"},false);await db.collection("customers").doc(regularId).delete();});
 await check("ownership-only profile saves and is reusable after deliveries",async()=>{const {savePrivateBottles}=load("@/lib/customers/private-bottles");const rows=await savePrivateBottles(customerId,[{origin:"JORDANIAN",sizeMl:20000,owned:3}],"preview-admin");assert.equal(rows[0].owned,3);assert.equal(rows[0].atStore,undefined);});
+await checkReceivedMoney({db,load,check,projectId:testApp.options.projectId,actor,customerId,bookId,input});
 await checkSettlements({db,load,check,projectId:testApp.options.projectId,actor,customerId,bookId,input});
 await checkRosters({db,load,check,employeeId,projectId:testApp.options.projectId});
 await checkShiftOpening({db,load,check,projectId:testApp.options.projectId,actor,Timestamp});

@@ -1,3 +1,4 @@
+import { receivedOrderMoney,receivedLineValues } from "@/lib/orders/received-money";
 import { orderMoneyDue, orderMoneyMethod } from "@/lib/orders/payment-plan";
 import "server-only";
 import { cache } from "react";
@@ -59,14 +60,16 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
   let storeActivityUnclassifiedFils=0;
   const events: DashboardEvent[] = [], products = new Map<string, DashboardOverview["products"][number]>();
   const stockById = new Map(stock.docs.map(d => [d.id, d.data()])), policyById = new Map(policies.docs.map(d => [d.id, d.data()]));
-  let storeSales = 0, deliverySales = 0, storeCount = 0, deliveryCount = 0, storeCash = 0, deliveryCash = 0, storeClick = 0, deliveryClick = 0, couponSales = 0, couponAwaiting = 0, bookletCash = 0, bookletClick = 0;
+  const couponSales=0;
+  let storeSales = 0, deliverySales = 0, storeCount = 0, deliveryCount = 0, storeCash = 0, deliveryCash = 0, storeClick = 0, deliveryClick = 0, couponCount=0,couponPendingCount=0,couponAwaiting = 0, bookletCash = 0, bookletClick = 0;
   function register(channel: "store" | "delivery", id: string, v: DocumentData, at: Date, total: number) {
     if (!["CASH", "CLICK", "COUPON"].includes(v.paymentMethod)) throw Error("Unknown dashboard payment");
     const key = bucketKey(at), current = buckets.get(key) ?? { key, label: key, fullLabel: key, store: 0, delivery: 0, count: 0 };
     current[channel] += total; ++current.count; buckets.set(key, current);
-    events.push({ items: (v.items ?? []).map((item: DocumentData) => ({ name: String(item.productNameSnapshot ?? "صنف"), quantity: amount(item.quantity), value: amount(item.lineTotalFils) })), id: `${channel}:${id}`, channel, kind: "sale", number: String(v.orderNumber ?? ""), employee: String(channel === "store" ? v.employeeNameSnapshot ?? "المحل" : v.deliveredByEmployeeName ?? v.deliveredByAdminName ?? v.employeeNameSnapshot ?? "الإدارة"), payment: v.paymentMethod, amount: total, at: at.toISOString(), bucket: key, href: channel === "delivery" ? `/admin/orders?order=${encodeURIComponent(id)}` : "/admin/reports" });
-    for (const item of v.items ?? []) {
-      const quantity = amount(item.quantity), value = amount(item.lineTotalFils), name = String(item.productNameSnapshot ?? "صنف");
+    const lineValues=v.items?.length?receivedLineValues(v.items,total):[];
+    events.push({coupons:Math.max(0,(v.couponQuantity??0)-(v.pendingCouponQuantity??0)),pendingCoupons:v.pendingCouponQuantity??0,deferred:["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(v.paymentState), items: (v.items ?? []).map((item: DocumentData,index:number) => ({ name: String(item.productNameSnapshot ?? "صنف"), quantity: amount(item.quantity), value: lineValues[index] })), id: `${channel}:${id}`, channel, kind: "sale", number: String(v.orderNumber ?? ""), employee: String(channel === "store" ? v.employeeNameSnapshot ?? "المحل" : v.deliveredByEmployeeName ?? v.deliveredByAdminName ?? v.employeeNameSnapshot ?? "الإدارة"), payment: v.paymentMethod, amount: total, at: at.toISOString(), bucket: key, href: channel === "delivery" ? `/admin/orders?order=${encodeURIComponent(id)}` : "/admin/reports" });
+    for (const [index,item] of (v.items ?? []).entries()) {
+      const quantity = amount(item.quantity), value = lineValues[index], name = String(item.productNameSnapshot ?? "صنف");
       const p = policyById.get(item.productId), physical = p?.mode === "STOCK" ? stockById.get(p.itemId) : null;
       const unit = p?.mode === "REFILL" || item.category === "REFILL" ? "تعبئة" : physical?.packLabel ?? "وحدة بيع";
       const productKey = `${item.productId}:${unit}`;
@@ -92,25 +95,33 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
     storeActivityUnclassifiedFils+=total-lineSum;
     storeActivity.set(key,current);
   }
+  const registeredCollections=new Set<string>();
+  function registerCollection(id:string,channel:"store"|"delivery",at:Date,value:number,method:"CASH"|"CLICK",number:string,customerId?:string){const key=bucketKey(at),bucket=buckets.get(key)??{key,label:key,fullLabel:key,store:0,delivery:0,count:0};bucket[channel]+=value;buckets.set(key,bucket);events.push({id:"collection:"+id,channel,kind:"collection",number,employee:"الإدارة",payment:method,amount:value,at:at.toISOString(),bucket:key,href:customerId?`/admin/customers/${encodeURIComponent(customerId)}`:"/admin/receivables"});}
   for (const d of rows(delivered)) {
     const v = d.data(), at = date(v.deliveredAt); if (v.status !== "DELIVERED" || !at || !belongs(v,"deliveredShiftId")) continue;
-    const total = amount(v.totalFils); deliverySales += total; ++deliveryCount;
-    if (v.paymentMethod === "COUPON") { couponSales += amount(v.couponValueFils ?? total); if (v.paymentState === "AWAITING_BOOKLET_APPROVAL") ++couponAwaiting; }
-    register("delivery", d.id, v, at, total);
+    ++deliveryCount;
+    if (v.paymentMethod === "COUPON") {couponCount+=Math.max(0,amount(v.couponQuantity??0)-amount(v.pendingCouponQuantity??0));couponPendingCount+=amount(v.pendingCouponQuantity??0);if((v.pendingCouponQuantity??0)>0)++couponAwaiting;}
+    const collectionAt=date(v.collectedAt)??at,received=collectionAt>=range.start&&collectionAt<cutoff?receivedOrderMoney(v as Parameters<typeof receivedOrderMoney>[0]):0;
+    if(received>0)registeredCollections.add(d.id);
+    register("delivery",d.id,v,at,received);
   }
-  const collectionRows = new Map(rows(collected).map(d => [d.id, d.data()]));
+  const collectionRows = new Map<string,DocumentData>(rows(collected).map(d => [d.id, {...d.data(),id:d.id}]));
   // Older collected orders without collectedAt use their delivery timestamp.
-  for (const d of rows(delivered)) if (!date(d.data().collectedAt) && d.data().paymentState === "COLLECTED") collectionRows.set(d.id, d.data());
+  for (const d of rows(delivered)) if (!date(d.data().collectedAt) && d.data().paymentState === "COLLECTED") collectionRows.set(d.id, {...d.data(),id:d.id});
   for (const v of collectionRows.values()) {
     if (v.collectionMode === "RECEIPTS" || v.status !== "DELIVERED" || v.paymentState !== "COLLECTED" || !belongs(v,"deliveredShiftId")) continue;
-    const total = amount(v.collectedFils ?? v.totalFils);
+    const total = receivedOrderMoney(v as Parameters<typeof receivedOrderMoney>[0]);
+    if(!total)continue;
+    if(!registeredCollections.has(v.id))registerCollection(v.id,"delivery",date(v.collectedAt)??date(v.deliveredAt)!,total,orderMoneyMethod(v as {paymentMethod:string}) as "CASH"|"CLICK",String(v.orderNumber??""),v.customerId);
     if (orderMoneyMethod(v as {paymentMethod:string}) === "CASH") deliveryCash += total; else if (orderMoneyMethod(v as {paymentMethod:string}) === "CLICK") deliveryClick += total;
   }
     for (const d of rows(receipts)) {
       const receipt=d.data(); if(receipt.kind!=="MONEY" || !belongs(receipt,"shiftId")) continue;
-      if(receipt.method==="CASH") deliveryCash+=(receipt.direction===-1?-1:1)*amount(receipt.amount);
-      else if(receipt.method==="CLICK") deliveryClick+=(receipt.direction===-1?-1:1)*amount(receipt.amount);
+      const received=(receipt.direction===-1?-1:1)*amount(receipt.amount),channel=receipt.channel==="STORE"?"store":"delivery";
+      if(receipt.method==="CASH"){if(channel==="store")storeCash+=received;else deliveryCash+=received;}
+      else if(receipt.method==="CLICK"){if(channel==="store")storeClick+=received;else deliveryClick+=received;}
       else throw Error("Unknown receivable collection method");
+      registerCollection(d.id,channel,date(receipt.receivedAt)!,received,receipt.method,receipt.source==="MANUAL"?"مستحق سابق":String(receipt.orderNumber??""),receipt.customerId);
     }
   for (const d of new Map([...rows(booklets),...rows(financialBooklets)].map(d=>[d.id,d])).values()) {
     const v = d.data(), at = date(v.channel === "STORE" ? v.financialAt ?? v.createdAt : v.createdAt); if (!at || at < range.start || at >= cutoff || v.isVoided || v.status === "CANCELLED" || !belongs(v,"shiftId")) continue;
@@ -119,6 +130,7 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
     if (v.paymentMethod === "CASH") { bookletCash += total; if (channel === "store") storeCash += total; else deliveryCash += total; }
     else if (v.paymentMethod === "CLICK") { bookletClick += total; if (channel === "store") storeClick += total; else deliveryClick += total; }
     else throw Error("Unknown booklet payment");
+    const key=bucketKey(at),bucket=buckets.get(key)??{key,label:key,fullLabel:key,store:0,delivery:0,count:0};bucket[channel]+=total;buckets.set(key,bucket);
     events.push({ id: `booklet:${d.id}`, channel, kind: "booklet", number: "", employee: String(v.employeeNameSnapshot ?? "الإدارة"), payment: v.paymentMethod, amount: total, at: at.toISOString(), bucket: bucketKey(at), href: "/admin/coupons" });
   }
   const currentHour = Number(hourly.format(now)), firstSale = buckets.size ? Math.min(...[...buckets.keys()].map(Number)) : Math.max(0, currentHour - 5);
@@ -129,7 +141,8 @@ export async function getDashboardOverview(period: DashboardPeriod = "today", no
   const activityKeys=period==="week"?keys:Array.from({length:(period==="yesterday"?23:currentHour)-(period==="yesterday"?0:activityFirst)+1},(_,i)=>String(i+(period==="yesterday"?0:activityFirst)).padStart(2,"0"));
   const activityBuckets=(period==="shift"?[...storeActivity.keys()].sort():activityKeys).map(key=>({key,...(storeActivity.get(key)??{bottles:0,other:0,count:0}),label:period==="shift"?key:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,weekday:"short",day:"numeric"}).format(midnight(key)):key+":00",fullLabel:period==="shift"?key:period==="week"?new Intl.DateTimeFormat("en-GB",{timeZone:zone,dateStyle:"full"}).format(midnight(key)):key+":00 – "+String(Number(key)+1).padStart(2,"0")+":00"}));
   events.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
-  return { cashCount:counted, selectedShiftId:selected?.id, shifts:shiftChoices, expectedCashFils:period==="shift"?(shift?.status==="CLOSED"?shift?.expectedHandoverFils??shift?.cashSalesFils??0:shift?.cashSalesFils??0):undefined, storeActivity:activityBuckets, storeActivityUnclassifiedFils, period, label: range.label, start: range.start.toISOString(), end: cutoff.toISOString(), at: now.toISOString(), status, storeSales, deliverySales, storeCount, deliveryCount, storeCash, deliveryCash, storeClick, deliveryClick, couponSales, couponAwaiting, bookletCash, bookletClick, bookletCount: events.filter(e => e.kind === "booklet").length, buckets: outputBuckets, products: [...products.values()], events: events.slice(0, 2000), eventCount: events.length, partial: status.partial || [sales, delivered, collected, receipts, booklets, financialBooklets, policies, stock, productDefinitions].some(s => s.size > MAX_ROWS) };
+  storeSales=storeCash+storeClick;deliverySales=deliveryCash+deliveryClick;
+  return { cashCount:counted, selectedShiftId:selected?.id, shifts:shiftChoices, expectedCashFils:period==="shift"?(shift?.status==="CLOSED"?shift?.expectedHandoverFils??shift?.cashSalesFils??0:shift?.cashSalesFils??0):undefined, storeActivity:activityBuckets, storeActivityUnclassifiedFils, period, label: range.label, start: range.start.toISOString(), end: cutoff.toISOString(), at: now.toISOString(), status, storeSales, deliverySales, storeCount, deliveryCount, storeCash, deliveryCash, storeClick, deliveryClick, couponSales,couponCount,couponPendingCount,couponAwaiting, bookletCash, bookletClick, bookletCount: events.filter(e => e.kind === "booklet").length, buckets: outputBuckets, products: [...products.values()], events: events.slice(0, 2000), eventCount: events.length, partial: status.partial || [sales, delivered, collected, receipts, booklets, financialBooklets, policies, stock, productDefinitions].some(s => s.size > MAX_ROWS) };
 }
 
 export { dayKey as ammanDayKey, midnight as ammanMidnight, shiftDay as calendarDay };

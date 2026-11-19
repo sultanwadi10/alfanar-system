@@ -7,7 +7,7 @@ export function unsigned(value: unknown): number {
 }
 export function receivableFromOrder(orderId: string, order: DocumentData, now: Timestamp, kind: "MONEY" | "COUPON", quantity: number) {
   const amount = unsigned(quantity);
-  return { customerId: order.customerId, customerName: String(order.customerNameSnapshot ?? ""), storeAuthUid: order.storeAuthUid,
+  return { source:"ORDER" as "ORDER"|"MANUAL", customerId: order.customerId, customerName: String(order.customerNameSnapshot ?? ""), storeAuthUid: order.storeAuthUid,
     orderId, orderNumber: String(order.orderNumber ?? orderId), kind, status: amount ? "OPEN" : "SETTLED",
     original: amount, outstanding: amount, settled: 0, expectedMethod: order.paymentMethod, createdAt: now, updatedAt: now };
 }

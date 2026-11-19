@@ -10,6 +10,7 @@ export async function checkSettlements({db,load,check,projectId,actor,customerId
   const nextActor={...actor,employeeId:"next"},active=await getActiveShift(actor.storeAuthUid);
   async function debt(){const result=await createDeliveryOrder(input("CASH",1,1),nextActor);await changeEmployeeOrderStatus(result.orderId,"READY",nextActor,false);await changeEmployeeOrderStatus(result.orderId,"DELIVERED",nextActor,false,[],[],true);return {receivableId:`order_${result.orderId}`,expectedOutstanding:500};}
   const first=await debt(),second=await debt(),items=[first,second];const start=(await read("shifts",active.id)).cashSalesFils;
+  const startingClick=(await read("shifts",active.id)).clickSalesFils;
   const request={requestId:randomUUID(),customerId,amount:750,method:"CASH",items,adminUid:"test-admin"};
   await check("batch rejects one stale order before writing any debt or cash",async()=>{
     await assert.rejects(settleReceivablesBatch({...request,items:[first,{...second,expectedOutstanding:501}]}),e=>e.code==="BALANCE_CHANGED");
@@ -25,7 +26,7 @@ export async function checkSettlements({db,load,check,projectId,actor,customerId
   });
   await check("CLICK settlement finishes the chosen debt without changing cash",async()=>{
     await settleReceivablesBatch({...request,requestId:randomUUID(),items:[{...second,expectedOutstanding:250}],amount:250,method:"CLICK"});
-    assert.equal((await read("shifts",active.id)).cashSalesFils,start+750);assert.equal((await read("shifts",active.id)).clickSalesFils,250);
+    assert.equal((await read("shifts",active.id)).cashSalesFils,start+750);assert.equal((await read("shifts",active.id)).clickSalesFils,startingClick+250);
   });
   await check("concurrent collections cannot overpay a customer",async()=>{
     const third=await debt(),body={...request,items:[third],amount:250};
@@ -55,10 +56,17 @@ export async function checkSettlements({db,load,check,projectId,actor,customerId
     assert.ok(await closeShift(request));assert.ok(await closeShift(request));await assert.rejects(closeShift({...request,actualCashFils:total+1}));assert.equal(await closeShift({...request,actualCashFils:total+1,coinsFils:request.coinsFils+1}),null);
     const overview=await getDashboardOverview("shift",new Date(),undefined,active.id);assert.equal(overview.cashCount.banknotesFils,1000);assert.equal(overview.cashCount.coinsFils,total-1000);assert.equal(overview.cashCount.actualCashFils,total);assert.equal(overview.cashCount.closed,true);assert.equal(overview.shifts.find(s=>s.id===active.id).shiftType,"MORNING");
   });
+  await check("receiving previous debt requires an open shift; no-shift failure writes nothing",async()=>{
+    const {createManualDebt}=load("@/lib/receivables/manual-debt");
+    const body={customerId,requestId:randomUUID(),amount:700,adminUid:"test-admin"},created=await createManualDebt(body);
+    const shiftBefore=await read("shifts",active.id);
+    await assert.rejects(settleReceivablesBatch({customerId,requestId:randomUUID(),amount:200,method:"CASH",items:[{receivableId:created.id,expectedOutstanding:700}],adminUid:"test-admin"}),e=>e.code==="NO_SHIFT");
+    assert.equal((await read("customerReceivables",created.id)).outstanding,700);assert.deepEqual(await read("shifts",active.id),shiftBefore);
+  });
   await check("shift totals exclude another shift's operations even when their timestamps overlap",async()=>{
-    const {Timestamp}=await import("firebase-admin/firestore");const openedAt=(await read("shifts",active.id)).openedAt;
+    const {Timestamp}=await import("firebase-admin/firestore");const openedAt=(await read("shifts",active.id)).openedAt;const baseline=await getDashboardOverview("shift",new Date(),undefined,active.id);
     await db.collection("directSales").doc(actor.storeAuthUid+"-foreign").set({createdAt:Timestamp.fromMillis(openedAt.toMillis()+1),shiftId:"unrelated",storeAuthUid:actor.storeAuthUid,paymentMethod:"CASH",totalFils:999999,items:[]});
     await db.collection("directSales").doc(actor.storeAuthUid+"-foreign-legacy").set({createdAt:Timestamp.fromMillis(openedAt.toMillis()+1),storeAuthUid:"unrelated",paymentMethod:"CASH",totalFils:999999,items:[]});
-    const overview=await getDashboardOverview("shift",new Date(),undefined,active.id);assert.equal(overview.storeSales,0);assert.equal(overview.storeCash,0);
+    const overview=await getDashboardOverview("shift",new Date(),undefined,active.id);assert.equal(overview.storeSales,baseline.storeSales);assert.equal(overview.storeCash,baseline.storeCash);
   });
 }

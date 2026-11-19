@@ -21,7 +21,7 @@ export async function customerAccount(customerId: string, storeAuthUid?: string)
   ]);
   const rows = new Map<string, ReturnType<typeof receivableFromOrder>>();
   for (const doc of debts.docs.slice(0, LIMIT)) {
-    const d = doc.data(); if (storeAuthUid && d.storeAuthUid !== storeAuthUid) continue;
+    const d = doc.data(); if (storeAuthUid && d.source!=="MANUAL" && d.storeAuthUid !== storeAuthUid) continue;
     if (!["MONEY", "COUPON"].includes(d.kind) || unsigned(d.original) !== unsigned(d.settled) + unsigned(d.outstanding)) throw new ReceivableError("INVALID_BALANCE", "بيانات المستحق غير متسقة.");
     rows.set(doc.id, d as ReturnType<typeof receivableFromOrder>);
   }
@@ -37,10 +37,10 @@ export async function customerAccount(customerId: string, storeAuthUid?: string)
     if (remaining > 22 || reserved > remaining) throw new ReceivableError("INVALID_BALANCE", "رصيد دفتر الكوبونات غير متسق.");
     availableCoupons += remaining - reserved;
   }
-  const outstanding = [...rows.entries()].filter(([, d]) => d.outstanding > 0).map(([id, d]) => ({ id, orderId: d.orderId, orderNumber: d.orderNumber, kind: d.kind, outstanding: d.outstanding, original: d.original, settled: d.settled, expectedMethod: d.expectedMethod, at: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : null })).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const outstanding = [...rows.entries()].filter(([, d]) => d.outstanding > 0).map(([id, d]) => ({ id, source:d.source??"ORDER", orderId: d.orderId, orderNumber: d.orderNumber, kind: d.kind, outstanding: d.outstanding, original: d.original, settled: d.settled, expectedMethod: d.expectedMethod, at: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : null })).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   const partial = [debts, orders, booklets, receipts].some(s => s && s.size > LIMIT);
   return { correctableOrders: storeAuthUid?[]:orders.docs.slice(0,LIMIT).filter(doc=>doc.data().status==="DELIVERED").map(doc=>{const d=doc.data();return {id:doc.id,number:String(d.orderNumber??doc.id),method:d.paymentMethod,items:(d.items??[]).map((i:FirebaseFirestore.DocumentData)=>({category:i.category,quantity:i.quantity,unitPriceFils:i.unitPriceFils})),consumedCoupons:(d.couponAllocations??[]).reduce((n:number,a:{quantity:number})=>n+a.quantity,0)+(d.couponQuantity??0)-(d.couponAllocations??[]).reduce((n:number,a:{quantity:number})=>n+a.quantity,0)-(d.pendingCouponQuantity??0)};}), privateBottles: await getPrivateBottles(customerId), moneyDueFils: outstanding.filter(d => d.kind === "MONEY").reduce((n, d) => n + d.outstanding, 0), couponsDue: outstanding.filter(d => d.kind === "COUPON").reduce((n, d) => n + d.outstanding, 0), availableCoupons, partial, outstanding,
-    receipts: receipts?.docs.slice(0, LIMIT).map(doc => { const d = doc.data(); return { id: doc.id, orderNumber: String(d.orderNumber ?? ""), amount: unsigned(d.amount)*(d.direction===-1?-1:1), method: String(d.method), at: d.receivedAt instanceof Timestamp ? d.receivedAt.toDate().toISOString() : null }; }).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")) ?? [] };
+    receipts: receipts?.docs.slice(0, LIMIT).map(doc => { const d = doc.data(); return { id: doc.id, source:d.source??"ORDER", orderNumber: String(d.orderNumber ?? ""), amount: unsigned(d.amount)*(d.direction===-1?-1:1), method: String(d.method), at: d.receivedAt instanceof Timestamp ? d.receivedAt.toDate().toISOString() : null }; }).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")) ?? [] };
 }
 export async function settleReceivable(input: { requestId: string; customerId: string; receivableId: string; amount: number; method: "CASH" | "CLICK" | "COUPON"; adminUid: string }) {
   checkCustomer(input.customerId);
@@ -86,6 +86,7 @@ export async function settleReceivable(input: { requestId: string; customerId: s
         if (doc.data()?.status === "OPEN" && doc.data()?.storeAuthUid === order.storeAuthUid) { shiftRef = ref; shift = doc.data(); }
       }
     }
+    if(input.method!=="COUPON"&&!shiftRef)throw new ReceivableError("NO_SHIFT","افتح شفتًا قبل تسجيل المبلغ المقبوض.");
     // All balance, booklet and shift reads precede every write.
     const outstanding = debt.outstanding - input.amount;
     const financial = shift?.shiftTimeSnapshot ?? shiftTimeSnapshot(now.toDate(), times);
@@ -99,7 +100,7 @@ export async function settleReceivable(input: { requestId: string; customerId: s
       tx.update(orderRef, { pendingCouponQuantity: outstanding, paymentState: outstanding ? "AWAITING_BOOKLET_APPROVAL" : "COUPONS_SETTLED", updatedAt: now });
     } else {
       tx.update(orderRef, { collectedFils: debt.original - outstanding, collectedAt: now, paymentState: outstanding ? "PARTIALLY_COLLECTED" : "COLLECTED", collectionMode: "RECEIPTS", updatedAt: now });
-      if (shiftRef) tx.update(shiftRef, { cashSalesFils: FieldValue.increment(input.method === "CASH" ? input.amount : 0), clickSalesFils: FieldValue.increment(input.method === "CLICK" ? input.amount : 0), receivableCollectionsFils: FieldValue.increment(input.amount), updatedAt: now });
+      if (shiftRef) tx.update(shiftRef, { cashSalesFils: FieldValue.increment(input.method === "CASH" ? input.amount : 0), clickSalesFils: FieldValue.increment(input.method === "CLICK" ? input.amount : 0), receivableCollectionsFils: FieldValue.increment(input.amount), totalSalesFils:FieldValue.increment(input.amount), updatedAt: now });
     }
     return { unchanged: false, outstanding };
   });

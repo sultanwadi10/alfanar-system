@@ -373,7 +373,7 @@ export async function changeAdminDeliveryOrderStatus(
           ? "AWAITING_BOOKLET_APPROVAL" : "COUPONS_SETTLED";
       }
       patch.deliveredShiftId = shiftRef?.id ?? null;
-      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(order.totalFils),cashSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
+      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(!input.paymentDeferred?orderMoneyDue(order):0),cashSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!input.paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
       if (input.paymentDeferred && orderMoneyDue(order) > 0) {
         patch.paymentState = "PAYMENT_DUE"; patch.collectedFils = 0; patch.collectionMode = "RECEIPTS";
         openOrderReceivable(tx, db, orderId, { ...order, totalFils: orderMoneyDue(order) }, now, "MONEY", orderMoneyDue(order));

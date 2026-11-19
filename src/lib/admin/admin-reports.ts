@@ -29,12 +29,12 @@ export async function getAdminReports(period: ReportPeriod, start?: string, end?
   const shifts: ShiftReportRow[] = closed.docs.slice(0, MAX_ROWS).flatMap(doc => {
     const v = doc.data(), openedAt = iso(v.openedAt), closedAt = iso(v.closedAt);
     if (v.status !== "CLOSED" || !openedAt || !closedAt) return [];
-    const cash = unsigned(v.cashSalesFils), actual = unsigned(v.actualCashFils);
+    const cash = signed(v.cashSalesFils), actual = unsigned(v.actualCashFils);
     const wage = recordedShiftWage(v);
     const expected = Number.isSafeInteger(v.expectedHandoverFils) ? signed(v.expectedHandoverFils) : cash;
     if (expected !== cash - (wage ?? 0) || signed(v.differenceFils) !== actual - expected) throw Error("Inconsistent shift settlement");
     const snapshot = v.shiftTimeSnapshot;
-    return [{ id: doc.id, employeeId: typeof v.closedByEmployeeId === "string" && v.closedByEmployeeId ? v.closedByEmployeeId : typeof v.openedByEmployeeId === "string" && v.openedByEmployeeId ? v.openedByEmployeeId : null, employee: String(v.closedByEmployeeNameSnapshot ?? v.openedByEmployeeNameSnapshot ?? "موظف"), openedAt, closedAt, workDay: snapshot?.workDay ?? null, shiftType: snapshot?.shiftType === "MORNING" || snapshot?.shiftType === "EVENING" ? snapshot.shiftType : "OTHER", times: snapshot?.times ?? null, cash, wage, wageStatus: v.payrollVersion === 2 ? v.wageSettlement : undefined, expected, actual, difference: actual - expected, sales: unsigned(v.totalSalesFils), click: unsigned(v.clickSalesFils), count: unsigned(v.saleCount) }];
+    return [{ id: doc.id, employeeId: typeof v.closedByEmployeeId === "string" && v.closedByEmployeeId ? v.closedByEmployeeId : typeof v.openedByEmployeeId === "string" && v.openedByEmployeeId ? v.openedByEmployeeId : null, employee: String(v.closedByEmployeeNameSnapshot ?? v.openedByEmployeeNameSnapshot ?? "موظف"), openedAt, closedAt, workDay: snapshot?.workDay ?? null, shiftType: snapshot?.shiftType === "MORNING" || snapshot?.shiftType === "EVENING" ? snapshot.shiftType : "OTHER", times: snapshot?.times ?? null, cash, wage, wageStatus: v.payrollVersion === 2 ? v.wageSettlement : undefined, expected, actual, difference: actual - expected, sales: signed(v.cashSalesFils)+signed(v.clickSalesFils), click: signed(v.clickSalesFils), count: unsigned(v.saleCount) }];
   });
   const purchases = movements.docs.slice(0, MAX_ROWS).flatMap(doc => {
     const v = doc.data(), at = iso(v.createdAt);

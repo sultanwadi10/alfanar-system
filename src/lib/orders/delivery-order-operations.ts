@@ -291,7 +291,7 @@ export async function changeEmployeeOrderStatus(
           : "COUPONS_SETTLED";
       }
       update.deliveredShiftId = shiftRef?.id ?? null;
-      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(order.totalFils),cashSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
+      if (shiftRef) tx.update(shiftRef,{saleCount:FieldValue.increment(1),totalSalesFils:FieldValue.increment(!paymentDeferred?orderMoneyDue(order):0),cashSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CASH"?orderMoneyDue(order):0),clickSalesFils:FieldValue.increment(!paymentDeferred&&orderMoneyMethod(order)==="CLICK"?orderMoneyDue(order):0),updatedAt:now});
       if (paymentDeferred && orderMoneyDue(order) > 0) {
         update.paymentState = "PAYMENT_DUE"; update.collectedFils = 0; update.collectionMode = "RECEIPTS";
         openOrderReceivable(tx, db, orderId, { ...order, totalFils: orderMoneyDue(order) }, now, "MONEY", orderMoneyDue(order));

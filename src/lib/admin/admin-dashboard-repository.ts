@@ -302,8 +302,7 @@ async function getCurrentShift(): Promise<
       shift.saleCount ?? 0,
 
     totalSalesFils:
-      shift.totalSalesFils ??
-      0,
+      (shift.cashSalesFils ?? 0) + (shift.clickSalesFils ?? 0),
 
     cashSalesFils:
       shift.cashSalesFils ??

@@ -14,4 +14,4 @@ export type AdminReports = {
   at: string; label: string; start: string; end: string; partial: boolean; counts: { shifts: number; purchases: number; stock: number };
 };
 
-export type BookletCashPeriod={id:string;day:string;period:string;shiftCash:number;receivableCash:number;receivableClick:number;bookletCash:number;bookletClick:number;wage:number;actual:number;expected:number;difference:number|null;open:number;closed:number;late:number;unknownWage:boolean};
+export type BookletCashPeriod={id:string;day:string;period:string;shiftCash:number;receivableCash:number;receivableClick:number;bookletCash:number;bookletClick:number;bookletCashInShift?:number;wage:number;actual:number;expected:number;difference:number|null;open:number;closed:number;late:number;unknownWage:boolean};

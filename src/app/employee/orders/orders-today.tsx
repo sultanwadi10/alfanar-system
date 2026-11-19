@@ -334,7 +334,7 @@ export default function OrdersToday() {
                     <strong>{formatMoney(order.totalFils)}</strong>
                   </div>
                   {order.status === "DELIVERED" && order.pendingCouponQuantity>0 && <p className={styles.bookletNote}>مستحق: {order.pendingCouponQuantity} كوبون</p>}
-                  {order.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(order.paymentState) && <p className={styles.bookletNote}>المتبقي: {formatMoney(order.totalFils-order.collectedFils)}</p>}
+                  {order.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(order.paymentState) && <p className={styles.bookletNote}>المتبقي: {formatMoney((order.moneyDueFils ?? (order.paymentMethod === "COUPON" ? 0 : order.totalFils))-order.collectedFils)}</p>}
                   {order.bookletRequestStatus && order.bookletRequestStatus !== "CANCELLED" && (
                     <p className={styles.bookletNote}>دفتر جديد مطلوب — بانتظار التسليم والاعتماد.</p>
                   )}
@@ -391,7 +391,7 @@ export default function OrdersToday() {
             {!!selectedOrder.previousBottleReturns?.length && <div className={styles.detailSection}><h3>فوارغ سابقة استُلمت مع الطلب</h3>{selectedOrder.previousBottleReturns.map(r => <p key={r.itemId}>{r.label}: {r.quantity}</p>)}</div>}
             <div className={styles.detailActions}>
               {selectedOrder.status === "DELIVERED" && selectedOrder.pendingCouponQuantity>0 && <p role="status">مستحق: {selectedOrder.pendingCouponQuantity} كوبون</p>}
-              {selectedOrder.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(selectedOrder.paymentState) && <p role="status">المتبقي: {formatMoney(selectedOrder.totalFils-selectedOrder.collectedFils)}</p>}
+              {selectedOrder.status === "DELIVERED" && ["PAYMENT_DUE","PARTIALLY_COLLECTED"].includes(selectedOrder.paymentState) && <p role="status">المتبقي: {formatMoney((selectedOrder.moneyDueFils ?? (selectedOrder.paymentMethod === "COUPON" ? 0 : selectedOrder.totalFils))-selectedOrder.collectedFils)}</p>}
               {selectedOrder.status === "NEW" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "READY")}>تأكيد تجهيز الطلب</button>}
               {selectedOrder.status === "READY" && <button type="button" disabled={busyId !== null} onClick={() => void changeStatus(selectedOrder, "DELIVERED")}>تأكيد التسليم</button>}
               {selectedOrder.status === "DELIVERED" && selectedOrder.bookletRequestStatus === "REQUESTED" && <button type="button" disabled={busyId !== null} onClick={() => void confirmBooklet(selectedOrder)}>تأكيد تسليم الدفتر وقبض ثمنه</button>}

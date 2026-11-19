@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { customerAccount, settleReceivable } from "@/lib/receivables/service";
 import { settleReceivablesBatch } from "@/lib/receivables/settle-batch";
+import { receivableIdPattern } from "@/lib/receivables/settlement-plan";
 import { ReceivableError } from "@/lib/receivables/records";
 import { getAdminSecurityContext } from "@/lib/security/get-admin-security-context";
 import { hasValidOrigin } from "@/lib/security/has-valid-origin";
@@ -11,7 +12,7 @@ import { withOperationChanges } from "@/lib/updates/operation-changes";
 const headers = { "Cache-Control": "private, no-store" };
 type Context = { params: Promise<{ customerId: string }> };
 const singleSchema = z.object({ requestId:z.string().uuid(), receivableId:z.string().regex(/^order_\d{8}-\d{3,8}$/), amount:z.number().int().min(1).max(1_000_000_000), method:z.enum(["CASH","CLICK","COUPON"]) }).strict();
-const schema = z.union([singleSchema,z.object({requestId:z.string().uuid(),amount:z.number().int().min(1).max(100_000_000),method:z.enum(["CASH","CLICK"]),items:z.array(z.object({receivableId:z.string().regex(/^order_\d{8}-\d{3,8}$/),expectedOutstanding:z.number().int().min(1)}).strict()).min(1).max(100)}).strict()]);
+const schema = z.union([singleSchema,z.object({requestId:z.string().uuid(),amount:z.number().int().min(1).max(100_000_000),method:z.enum(["CASH","CLICK"]),items:z.array(z.object({receivableId:z.string().regex(receivableIdPattern),expectedOutstanding:z.number().int().min(1)}).strict()).min(1).max(100)}).strict()]);
 function failure(error:unknown) {
   if (isSecurityError(error)) return toSecurityResponse(error);
   if (error instanceof ReceivableError) return NextResponse.json({success:false,error:{code:error.code,message:error.message}},{status:error.code==="NOT_FOUND"?404:409,headers});
