@@ -198,10 +198,10 @@ async function handlePOST(
 
     const body=await request.json().catch(()=>({}));
     const parsed=z.object({shiftType:z.enum(["MORNING","EVENING"]).optional()}).strict().safeParse(body);
-    if(!parsed.success)return NextResponse.json({success:false,error:{message:"اختر نوع الشفت."}},{status:400});
+    if(!parsed.success)return NextResponse.json({success:false,error:{message:"تعذر فتح الشفت. حدّث الصفحة وأعد المحاولة."}},{status:400});
     const shift =
       await startShift({
-        shiftType:parsed.data.shiftType,
+        // Older cached clients may send a choice; the server uses the roster.
         storeAuthUid:
           storeContext.authUid,
 

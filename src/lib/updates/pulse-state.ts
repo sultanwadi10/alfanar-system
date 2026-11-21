@@ -8,7 +8,7 @@ import { AUTH_SESSION_CONFIG } from "@/lib/auth/session-config";
 import { OPERATOR_SESSION_CONFIG } from "@/lib/auth/operator-session-config";
 import { STORE_DEVICE_CONFIG } from "@/lib/store/store-device-config";
 
-type Entry = { employeeId: string | null; version: string; expires: number };
+type Entry = { employeeId: string | null; operatorExpiresAt:string|null; version: string; expires: number };
 const entries = new Map<string, Entry>();
 // This cache is exclusively a UI heartbeat. Business APIs never use it and
 // continue to verify the live session/device/schedule before every operation.
@@ -20,7 +20,7 @@ export async function readPulseState() {
   let changes;
   if (prior && prior.expires > Date.now()) {
     changes = await readOperationChanges();
-    if (prior.version === changes.access) return { ok: true, operatorEmployeeId: prior.employeeId, changes };
+    if (prior.version === changes.access) return { ok: true, operatorEmployeeId: prior.employeeId, operatorExpiresAt:prior.operatorExpiresAt, changes };
   }
   // Do not let a fabricated cookie trigger marker reads before the store gate.
   const store = await getStoreSecurityContext();
@@ -33,6 +33,7 @@ export async function readPulseState() {
     for (const [id, entry] of entries) if (entry.expires <= Date.now()) entries.delete(id);
     if (entries.size >= 256) entries.delete(entries.keys().next().value!);
   }
-  entries.set(key, { employeeId, version: changes.access, expires: Date.now() + 60000 });
-  return { ok: true, operatorEmployeeId: employeeId, changes };
+  const operatorExpiresAt=operator?.expiresAt.toISOString()??null;
+  entries.set(key, { employeeId,operatorExpiresAt, version: changes.access, expires: Math.min(Date.now() + 60000,operator?.expiresAt.getTime()??Infinity) });
+  return { ok: true, operatorEmployeeId: employeeId,operatorExpiresAt, changes };
 }

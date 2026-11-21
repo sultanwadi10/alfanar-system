@@ -1,4 +1,5 @@
 import "server-only";
+import { OPERATOR_SESSION_MS } from "./operator-session-lifetime";
 
 export const OPERATOR_SESSION_CONFIG =
   {
@@ -6,7 +7,7 @@ export const OPERATOR_SESSION_CONFIG =
       "alfanar_operator_session",
 
     EXPIRES_IN_MS:
-      8 * 60 * 60 * 1000,
+      OPERATOR_SESSION_MS,
 
     MAX_PIN_ATTEMPTS: 5,
 

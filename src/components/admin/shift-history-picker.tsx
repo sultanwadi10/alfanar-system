@@ -8,10 +8,11 @@ type Shift=NonNullable<DashboardOverview["shifts"]>[number];
 const typeName=(shift:Shift)=>shift.shiftType==="MORNING"?"صباحي":shift.shiftType==="EVENING"?"مسائي":"شفت";
 const date=(at:string)=>new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Amman",day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(at));
 const time=(at:string)=>new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Amman",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date(at));
+const workDate=(shift:Shift)=>date(shift.workDay+"T12:00:00Z");
 export function ShiftHistoryPicker({shifts,selectedId,onSelect,disabled=false}:{shifts:Shift[];selectedId:string;onSelect:(id:string)=>void;disabled?:boolean}){
   const [open,setOpen]=useState(false),[query,setQuery]=useState("");
   const root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),search=useRef<HTMLInputElement>(null),options=useRef(new Map<string,HTMLButtonElement>()),id=useId();
-  const selected=shifts.find(s=>s.id===selectedId),shown=shifts.filter(s=>`${s.employee} ${date(s.openedAt)} ${typeName(s)} ${s.closedAt?"مغلق":"مفتوح"}`.includes(query.trim()));
+  const selected=shifts.find(s=>s.id===selectedId),shown=shifts.filter(s=>`${s.employee} ${workDate(s)} ${date(s.openedAt)} ${typeName(s)} ${s.closedAt?"مغلق":"مفتوح"}`.includes(query.trim()));
   useEffect(()=>{
     if(!open)return;
     search.current?.focus();
@@ -31,11 +32,11 @@ export function ShiftHistoryPicker({shifts,selectedId,onSelect,disabled=false}:{
   }
   return <div className={styles.root} ref={root} onKeyDown={navigate}>
     <button className={styles.trigger} ref={trigger} type="button" disabled={disabled||!shifts.length} aria-haspopup="listbox" aria-expanded={open} aria-controls={id} onClick={()=>{setQuery("");setOpen(!open);}}>
-      <span className={styles.icon}><AlfanarIcon name={selected?.shiftType==="EVENING"?"moon":"sun"} size={21}/></span><span className={styles.summary}><small>سجل الشفتات</small><strong>{selected?`${typeName(selected)} · ${selected.employee}`:"لا توجد شفتات"}</strong>{selected&&<span><bdi>{date(selected.openedAt)} · {time(selected.openedAt)}</bdi><i className={!selected.closedAt?styles.active:""}/>{selected.closedAt?"مغلق":"مفتوح"}</span>}</span><AlfanarIcon name={open?"chevron-up":"chevron-down"}/>
+      <span className={styles.icon}><AlfanarIcon name={selected?.shiftType==="EVENING"?"moon":"sun"} size={21}/></span><span className={styles.summary}><small>سجل الشفتات</small><strong>{selected?`${typeName(selected)} · ${selected.employee}`:"لا توجد شفتات"}</strong>{selected&&<span><bdi title={`فتح الشفت: ${date(selected.openedAt)} ${time(selected.openedAt)}`}>{workDate(selected)} · {time(selected.openedAt)}</bdi><i className={!selected.closedAt?styles.active:""}/>{selected.closedAt?"مغلق":"مفتوح"}</span>}</span><AlfanarIcon name={open?"chevron-up":"chevron-down"}/>
     </button>
     {open&&<div className={styles.popup}><label className={styles.search}><AlfanarIcon name="search"/><input ref={search} aria-label="البحث في الشفتات" placeholder="اسم الموظف أو التاريخ" value={query} onChange={e=>setQuery(e.target.value)}/></label>
       <div id={id} role="listbox" aria-label="سجل الشفتات" className={styles.list}>{shown.map(shift=><button key={shift.id} type="button" role="option" aria-selected={shift.id===selectedId} tabIndex={-1} ref={element=>{if(element)options.current.set(shift.id,element);else options.current.delete(shift.id);}} onClick={()=>{onSelect(shift.id);close();}}>
-        <span className={`${styles.typeIcon} ${shift.shiftType==="EVENING"?styles.evening:styles.morning}`}><AlfanarIcon name={shift.shiftType==="EVENING"?"moon":"sun"}/></span><span className={styles.detail}><strong><span className={styles.employeeName}>{shift.employee}</span><small>{typeName(shift)}</small></strong><span dir="ltr">{date(shift.openedAt)} · {time(shift.openedAt)}</span></span><span className={`${styles.status} ${!shift.closedAt?styles.openStatus:""}`}>{shift.closedAt?"مغلق":"مفتوح"}</span>{shift.id===selectedId&&<AlfanarIcon className={styles.check} name="check" size={17}/>}</button>)}</div>{!shown.length&&<p className={styles.empty}>لا توجد شفتات مطابقة</p>}
+        <span className={`${styles.typeIcon} ${shift.shiftType==="EVENING"?styles.evening:styles.morning}`}><AlfanarIcon name={shift.shiftType==="EVENING"?"moon":"sun"}/></span><span className={styles.detail}><strong><span className={styles.employeeName}>{shift.employee}</span><small>{typeName(shift)}</small></strong><span dir="ltr" title={`فتح الشفت: ${date(shift.openedAt)} ${time(shift.openedAt)}`}>{workDate(shift)} · {time(shift.openedAt)}</span></span><span className={`${styles.status} ${!shift.closedAt?styles.openStatus:""}`}>{shift.closedAt?"مغلق":"مفتوح"}</span>{shift.id===selectedId&&<AlfanarIcon className={styles.check} name="check" size={17}/>}</button>)}</div>{!shown.length&&<p className={styles.empty}>لا توجد شفتات مطابقة</p>}
     </div>}
   </div>;
 }

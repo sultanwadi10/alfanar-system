@@ -1,4 +1,6 @@
 import { readPulseState } from "@/lib/updates/pulse-state";
+import { cookies } from "next/headers";
+import { OPERATOR_SESSION_CONFIG } from "@/lib/auth/operator-session-config";
 import {
   NextResponse,
 } from "next/server";
@@ -14,7 +16,7 @@ export async function GET() {
   try {
     const state = await readPulseState();
 
-    return NextResponse.json(
+    const response=NextResponse.json(
       state,
       {
         headers: {
@@ -23,6 +25,9 @@ export async function GET() {
         },
       },
     );
+    // Keep the existing cookie until its fixed nine-hour deadline, never sliding it.
+    if(state.operatorEmployeeId&&state.operatorExpiresAt){const token=(await cookies()).get(OPERATOR_SESSION_CONFIG.COOKIE_NAME)?.value;if(token)response.cookies.set(OPERATOR_SESSION_CONFIG.COOKIE_NAME,token,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",path:"/",expires:new Date(state.operatorExpiresAt)});}
+    return response;
   } catch (error) {
     if (
       isSecurityError(

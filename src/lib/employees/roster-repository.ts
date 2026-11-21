@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { Timestamp,type Firestore,type Transaction } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/firebase/admin";
-import { DEFAULT_SHIFT_TIMES } from "@/lib/shifts/shift-payroll";
+import { DEFAULT_SHIFT_TIMES,shiftTimeSnapshot } from "@/lib/shifts/shift-payroll";
 import { employeeScheduleSchema,shiftTimeSettingsSchema } from "@/lib/validation/employee-schedule";
 import { ammanCalendarDate,addRosterDays,emptyRosterSchedule,rosterConflict,rosterWeekStart,validRosterWeek,type RosterWeek } from "./roster-week";
 
@@ -63,11 +63,14 @@ export async function saveRosterWeek(input:Omit<RosterWeek,"employees"|"revision
   });
 }
 export async function currentRosterContext(tx:Transaction,db:Firestore,at:Date,employeeId?:string){
-  const week=rosterWeekStart(ammanCalendarDate(at));
-  const [roster,baseline,legacy,oldSchedule]=await Promise.all([tx.get(db.collection(WEEKS).doc(week)),tx.get(db.collection("systemSettings").doc(BASELINE)),tx.get(db.collection("systemSettings").doc("employeeShiftTimes")),employeeId?tx.get(db.collection("employeeSchedules").doc(employeeId)):Promise.resolve(null)]);
-  const saved=roster.exists?storedWeek(week,roster.data()!):baseline.exists?storedWeek(String(baseline.data()!.weekStart),baseline.data()!):null;
+  const day=ammanCalendarDate(at),week=rosterWeekStart(day),previousWeek=addRosterDays(week,-7);
+  const [roster,baseline,legacy,oldSchedule,previous]=await Promise.all([tx.get(db.collection(WEEKS).doc(week)),tx.get(db.collection("systemSettings").doc(BASELINE)),tx.get(db.collection("systemSettings").doc("employeeShiftTimes")),employeeId?tx.get(db.collection("employeeSchedules").doc(employeeId)):Promise.resolve(null),day===week?tx.get(db.collection(WEEKS).doc(previousWeek)):Promise.resolve(null)]);
+  let saved=roster.exists?storedWeek(week,roster.data()!):baseline.exists?storedWeek(String(baseline.data()!.weekStart),baseline.data()!):null,effectiveWeek=week;
+  // Friday's overnight shift keeps Friday's roster and terms across Saturday.
+  const prior=previous?.exists?storedWeek(previousWeek,previous.data()!):baseline.exists&&baseline.data()!.weekStart===previousWeek?storedWeek(previousWeek,baseline.data()!):null;
+  if(day===week&&prior&&shiftTimeSnapshot(at,prior.settings).workDay<day){saved=prior;effectiveWeek=previousWeek;}
   const settings=saved?.settings??shiftTimeSettingsSchema.parse(legacy.data()??DEFAULT_SHIFT_TIMES);
-  const schedule=employeeId&&saved?.weekStart===week?saved.schedules[employeeId]??emptyRosterSchedule():baseline.exists||roster.exists?emptyRosterSchedule():employeeScheduleSchema.parse({...emptyRosterSchedule(),...oldSchedule?.data()});
+  const schedule=employeeId&&saved?.weekStart===effectiveWeek?saved.schedules[employeeId]??emptyRosterSchedule():baseline.exists||roster.exists?emptyRosterSchedule():employeeScheduleSchema.parse({...emptyRosterSchedule(),...oldSchedule?.data()});
   return {settings,schedule};
 }
 export async function currentRosterTimes(tx:Transaction,db:Firestore,at:Date){return (await currentRosterContext(tx,db,at)).settings;}

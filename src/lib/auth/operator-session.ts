@@ -1,4 +1,5 @@
 import "server-only";
+import { operatorSessionExpiry } from "./operator-session-lifetime";
 import { OPERATOR_SESSION_CUTOFFS, operatorSessionCutoffId } from "./operator-session-cutoff";
 
 import {
@@ -55,15 +56,6 @@ function hashToken(
   )
     .update(token)
     .digest("hex");
-}
-
-function isExpired(
-  timestamp: Timestamp,
-) {
-  return (
-    timestamp.toMillis() <=
-    Date.now()
-  );
 }
 
 export async function createOperatorSession(
@@ -175,14 +167,13 @@ export async function resolveOperatorSession(
 
   const record =
     snapshot.data() as OperatorSessionRecord;
+  const expiresAt=record.createdAt instanceof Timestamp&&record.expiresAt instanceof Timestamp?operatorSessionExpiry(record.createdAt.toMillis(),record.expiresAt.toMillis()):0;
 
   if (
     record.revokedAt ||
     record.storeAuthUid !==
       storeAuthUid ||
-    isExpired(
-      record.expiresAt,
-    )
+    expiresAt<=Date.now()
   ) {
     return null;
   }
@@ -230,7 +221,7 @@ export async function resolveOperatorSession(
     storeAuthUid,
 
     expiresAt:
-      record.expiresAt.toDate(),
+      new Date(expiresAt),
   };
 }
 
